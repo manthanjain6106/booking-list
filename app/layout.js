@@ -1,7 +1,7 @@
 import './globals.css';
 import { Inter } from 'next/font/google';
+import { Providers } from './providers'; // adjust path if needed
 
-// Initialize the Inter font
 const inter = Inter({ 
   subsets: ['latin'],
   display: 'swap',
@@ -17,7 +17,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${inter.variable} scroll-smooth`}>
       <body className="min-h-screen bg-gray-50 font-sans">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
