@@ -1,40 +1,37 @@
-import { MongoClient } from 'mongodb';
+import { MongoClient } from "mongodb";
 
 const uri = process.env.MONGODB_URI;
 const options = {
   useUnifiedTopology: true,
   useNewUrlParser: true,
+  serverSelectionTimeoutMS: 30000, // Optional: Time to wait for MongoDB connection
+  socketTimeoutMS: 30000, // Optional: Socket timeout
 };
 
 let client;
 let clientPromise;
 
 if (!uri) {
-  throw new Error('Please add your MongoDB URI to .env.local');
+  throw new Error("Please add your MongoDB URI to .env.local");
 }
 
-// In development mode, use a global variable so that the value
-// is preserved across module reloads caused by HMR (Hot Module Replacement).
-if (process.env.NODE_ENV === 'development') {
-  // In development mode, use a global variable so that the value
-  // is preserved across module reloads caused by HMR (Hot Module Replacement).
-  let globalWithMongo = global;
-
-  if (!globalWithMongo._mongoClientPromise) {
+// In development mode, use a global variable so that the value is preserved across module reloads caused by HMR (Hot Module Replacement).
+if (process.env.NODE_ENV === "development") {
+  if (!global._mongoClientPromise) {
     client = new MongoClient(uri, options);
-    globalWithMongo._mongoClientPromise = client.connect();
+    global._mongoClientPromise = client.connect();
   }
-  clientPromise = globalWithMongo._mongoClientPromise;
+  clientPromise = global._mongoClientPromise;
 } else {
-  // In production mode, it's best to not use a global variable.
+  // In production mode, create a new MongoClient and connect directly.
   client = new MongoClient(uri, options);
   clientPromise = client.connect();
 }
 
-// Helper function to get database connection
+// Helper function to get the database connection
 export async function connectToDatabase() {
   if (!clientPromise) {
-    throw new Error('MongoDB client promise is not initialized');
+    throw new Error("MongoDB client promise is not initialized");
   }
   
   const client = await clientPromise;
@@ -46,6 +43,5 @@ export async function connectToDatabase() {
   };
 }
 
-// Export a module-scoped MongoClient promise. By doing this in a
-// separate module, the client can be shared across functions.
+// Export a module-scoped MongoClient promise.
 export default clientPromise;

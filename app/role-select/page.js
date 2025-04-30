@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
 import Image from "next/image";
 
 export default function RoleSelectPage() {
@@ -26,7 +25,7 @@ export default function RoleSelectPage() {
 
     try {
       // Update user role in database
-      const response = await fetch("/api/user/role", {
+      const response = await fetch("/api/users", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -41,14 +40,14 @@ export default function RoleSelectPage() {
 
       // Redirect based on role
       switch (role) {
-        case "guest":
-          router.push("/guest-dashboard");
-          break;
+        // case "guest":
+        //   router.push("/guest");
+        //   break;
         case "agent":
-          router.push("/agent-dashboard");
+          router.push("/dashboard/agent");
           break;
         case "host":
-          router.push("/host-dashboard");
+          router.push("/dashboard/host");
           break;
         default:
           router.push("/");
