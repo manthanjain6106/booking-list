@@ -1,5 +1,4 @@
 import React from 'react';
-import AdminBookingCalendar from '@/components/AdminBookingCalendar';
 
 export default function AdminDashboardPage() {
   return (
@@ -7,7 +6,6 @@ export default function AdminDashboardPage() {
       <h1 style={{ textAlign: 'center', color: '#2d3748', marginBottom: '2rem' }}>
         Admin Dashboard
       </h1>
-      <AdminBookingCalendar />
     </main>
   );
 }
