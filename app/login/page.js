@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 
-export default function Login() {
+export default function LoginClient() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -185,5 +185,17 @@ export default function Login() {
         </div>
       </div>
     </div>
+  );
+}
+
+// This file is now a server component
+import React, { Suspense } from "react";
+import LoginClient from "./LoginClient";
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginClient />
+    </Suspense>
   );
 }
