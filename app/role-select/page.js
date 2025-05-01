@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -10,6 +10,25 @@ export default function RoleSelectPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
+
+  useEffect(() => {
+    // Always check latest onboarding status from backend
+    const checkOnboarding = async () => {
+      if (!session?.user?.email) return;
+      try {
+        const res = await fetch('/api/users');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.hasOnboarded) {
+            router.replace('/dashboard');
+          }
+        }
+      } catch (e) {
+        // Optionally handle error
+      }
+    };
+    checkOnboarding();
+  }, [session, router]);
 
   if (status === "loading") {
     return (
@@ -92,6 +111,14 @@ export default function RoleSelectPage() {
 
         {/* Role selection buttons */}
         <div className="mt-8 space-y-4">
+
+        <button
+            onClick={() => handleRoleSelection("host")}
+            disabled={isLoading}
+            className="w-full flex justify-center py-3 px-4 border border-gray-300 text-sm font-medium rounded-md bg-blue-700 hover:bg-blue-500 text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Login as Host
+          </button>
           
           <button
             onClick={() => handleRoleSelection("agent")}
@@ -101,13 +128,9 @@ export default function RoleSelectPage() {
             Login as Agent
           </button>
           
-          <button
-            onClick={() => handleRoleSelection("host")}
-            disabled={isLoading}
-            className="w-full flex justify-center py-3 px-4 border border-gray-300 text-sm font-medium rounded-md bg-blue-700 hover:bg-blue-500 text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            Login as Host
-          </button>
+          
+
+          
         </div>
       </div>
     </div>

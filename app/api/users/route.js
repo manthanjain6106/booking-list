@@ -67,3 +67,16 @@ export async function POST(req) {
     );
   }
 }
+
+export async function GET(req) {
+  await dbConnect();
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user?.email) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+  }
+  const user = await User.findOne({ email: session.user.email });
+  if (!user) {
+    return new Response(JSON.stringify({ error: 'User not found' }), { status: 404 });
+  }
+  return new Response(JSON.stringify({ hasOnboarded: user.hasOnboarded }), { status: 200 });
+}

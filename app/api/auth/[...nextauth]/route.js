@@ -55,6 +55,7 @@ export const authOptions = {
       if (account && user) {
         token.role = user.role || "guest";
         token.userId = user.id;
+        token.hasOnboarded = user.hasOnboarded || false;
 
         if (account.provider === "google") {
           const db = (await clientPromise).db(process.env.MONGODB_DB);
@@ -68,13 +69,16 @@ export const authOptions = {
               name: user.name,
               image: user.image,
               role: "guest",
+              hasOnboarded: false,
               createdAt: new Date(),
             });
 
             token.userId = result.insertedId.toString();
+            token.hasOnboarded = false;
           } else {
             token.userId = existingUser._id.toString();
             token.role = existingUser.role || "guest";
+            token.hasOnboarded = existingUser.hasOnboarded || false;
           }
         }
       }
@@ -84,6 +88,7 @@ export const authOptions = {
       if (token) {
         session.user.id = token.userId;
         session.user.role = token.role;
+        session.user.hasOnboarded = token.hasOnboarded;
       }
       return session;
     },

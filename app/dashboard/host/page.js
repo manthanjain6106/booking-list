@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+import HostDashboardCalendar from "../../../components/HostDashboardCalendar";
 
 export default function HostDashboard() {
   const { data: session, status } = useSession();
@@ -37,6 +38,9 @@ export default function HostDashboard() {
           <li>Check-in / Check-out guests</li>
         </ul>
       </div>
+
+      {/* Host Calendar View */}
+      <HostDashboardCalendar />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -13,6 +14,7 @@ export default function Login() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const { data: session } = useSession();
 
   const handleEmailLogin = async (e) => {
     e.preventDefault();
@@ -30,8 +32,16 @@ export default function Login() {
         setIsLoading(false);
         // Error is shown from the URL parameter
       } else {
-        // On successful login, redirect
-        router.push(result?.url || "/dashboard");
+        // Wait for session to update
+        setTimeout(async () => {
+          const res = await fetch("/api/auth/session");
+          const sessionData = await res.json();
+          if (sessionData?.user?.hasOnboarded) {
+            router.push("/dashboard");
+          } else {
+            router.push("/role-select");
+          }
+        }, 500);
       }
     } catch (error) {
       setIsLoading(false);
@@ -40,8 +50,19 @@ export default function Login() {
 
   const handleGoogleLogin = () => {
     setIsLoading(true);
-    signIn("google", { callbackUrl });
+    signIn("google", { callbackUrl: "/" }); // We'll handle redirect after login
   };
+
+  // Handle Google login redirect
+  React.useEffect(() => {
+    if (session && typeof window !== "undefined") {
+      if (session.user?.hasOnboarded) {
+        router.replace("/dashboard");
+      } else {
+        router.replace("/role-select");
+      }
+    }
+  }, [session]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

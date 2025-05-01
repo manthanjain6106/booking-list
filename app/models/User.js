@@ -36,6 +36,10 @@ const User = mongoose.models.User || mongoose.model('User', new mongoose.Schema(
     type: Boolean,
     default: false,
   },
+  hasOnboarded: {
+    type: Boolean,
+    default: false,
+  },
  
 }));
 
