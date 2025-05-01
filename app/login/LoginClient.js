@@ -58,7 +58,7 @@ export default function LoginClient() {
         <button type="submit">Login</button>
       </form>
       <p>
-        Don't have an account? <Link href="/register">Register</Link>
+        Don&#39;t have an account? <Link href="/register">Register</Link>
       </p>
     </div>
   );
