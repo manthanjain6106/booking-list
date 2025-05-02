@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
-// Check if models already exists to prevent overwriting
-const Property = mongoose.models.Property || mongoose.model('Property', new mongoose.Schema({
+// Define the schema first
+const PropertySchema = new mongoose.Schema({
   host: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -50,6 +50,11 @@ const Property = mongoose.models.Property || mongoose.model('Property', new mong
     required: [true, 'Payment ID for the custom payment system is required'],
     trim: true,
   },
+  bankAccountName: {
+    type: String,
+    required: [true, 'Bank account name is required'],
+    trim: true,
+  },
   phoneNumbers: [{
     type: String,
     required: [true, 'At least one phone number is required'],
@@ -66,21 +71,41 @@ const Property = mongoose.models.Property || mongoose.model('Property', new mong
     required: [true, 'Total number of rooms is required'],
     min: [1, 'Property must have at least 1 room'],
   },
+  pricing: {
+    type: {
+      type: String,
+      enum: ['perPerson', 'perRoom'],
+      required: [true, 'Pricing type is required'],
+    },
+    value: {
+      type: Number,
+      required: [true, 'Price value is required'],
+      min: [1, 'Price must be at least 1'],
+    }
+  },
   amenities: [{
     type: String,
     trim: true,
   }],
   images: [{
     type: String,
-    // URLs to property images
   }],
   isActive: {
     type: Boolean,
     default: true,
   },
+  isVerified: {
+    type: Boolean,
+    default: false,
+  },
+  status: {
+    type: String,
+    enum: ['active', 'inactive', 'pending', 'suspended'],
+    default: 'active',
+  },
   bookingModificationTimeframe: {
     type: Number,
-    default: 10, // Default 10 days before check-in for modifications
+    default: 10,
     min: [0, 'Booking modification timeframe cannot be negative'],
   },
   createdAt: {
@@ -91,7 +116,6 @@ const Property = mongoose.models.Property || mongoose.model('Property', new mong
     type: Date,
     default: Date.now,
   },
-  // For approved agents who can book for this property
   approvedAgents: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -100,20 +124,22 @@ const Property = mongoose.models.Property || mongoose.model('Property', new mong
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true },
-}));
+});
 
-// Virtual populate rooms
-Property.virtual('rooms', {
+// Add virtuals to the schema before model creation
+PropertySchema.virtual('rooms', {
   ref: 'Room',
   foreignField: 'property',
   localField: '_id',
 });
 
-// Virtual populate bookings
-Property.virtual('bookings', {
+PropertySchema.virtual('bookings', {
   ref: 'Booking',
   foreignField: 'property',
   localField: '_id',
 });
+
+// Create the model
+const Property = mongoose.models.Property || mongoose.model('Property', PropertySchema);
 
 export default Property;
