@@ -105,48 +105,56 @@ export default function HostDashboard() {
         </div>
       )}
 
-      <div className="mt-6 bg-white rounded-md shadow-md p-4">
-        <h2 className="text-xl font-semibold text-indigo-700 mb-2">Quick Actions</h2>
-        <ul className="list-disc pl-6 text-gray-700">
-          {!property ? (
-            <li>
-              <button 
-                onClick={() => router.push("/dashboard/property/register")}
-                className="text-indigo-600 hover:underline"
-              >
-                Register a new property
-              </button>
-            </li>
-          ) : (
-            <>
-              <li>
-                <button 
-                  onClick={() => router.push("/dashboard/host/rooms")}
-                  className="text-indigo-600 hover:underline"
-                >
-                  Manage your rooms and pricing
-                </button>
-              </li>
-              <li>
-                <button 
-                  onClick={() => router.push("/dashboard/host/bookings")}
-                  className="text-indigo-600 hover:underline"
-                >
-                  View today's bookings
-                </button>
-              </li>
-              <li>
-                <button 
-                  onClick={() => router.push("/dashboard/host/checkin")}
-                  className="text-indigo-600 hover:underline"
-                >
-                  Check-in / Check-out guests
-                </button>
-              </li>
-            </>
-          )}
-        </ul>
-      </div>
+{/* Responsive Quick Actions Buttons Component */}
+<div className="mt-4 sm:mt-6 bg-white rounded-lg shadow-md p-4 sm:p-6">
+  <h2 className="text-lg sm:text-xl font-semibold text-indigo-700 mb-3 sm:mb-4">Quick Actions</h2>
+  
+  <div className="grid gap-3 sm:gap-4">
+    {!property ? (
+      <button 
+        onClick={() => router.push("/dashboard/property/register")}
+        className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-md px-4 py-3 transition-colors flex items-center justify-between group"
+      >
+        <span className="text-sm sm:text-base">Register a new property</span>
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    ) : (
+      <>
+        <button 
+          onClick={() => router.push("/dashboard/host/rooms")}
+          className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-md px-4 py-3 transition-colors flex items-center justify-between group"
+        >
+          <span className="text-sm sm:text-base">Manage your rooms and pricing</span>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+        
+        <button 
+          onClick={() => router.push("/dashboard/host/bookings")}
+          className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-md px-4 py-3 transition-colors flex items-center justify-between group"
+        >
+          <span className="text-sm sm:text-base">View today's bookings</span>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+        
+        <button 
+          onClick={() => router.push("/dashboard/host/checkin")}
+          className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-md px-4 py-3 transition-colors flex items-center justify-between group"
+        >
+          <span className="text-sm sm:text-base">Check-in / Check-out guests</span>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </>
+    )}
+  </div>
+</div>
 
       {property && <HostDashboardCalendar />}
     </div>

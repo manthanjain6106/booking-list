@@ -1,5 +1,5 @@
+// /app/api/users/route.js
 import { connectToDatabase } from "@/app/utils/db";
-import User from "@/app/models/User";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
@@ -8,17 +8,13 @@ export async function POST(req) {
     // 1. Get logged-in user's session
     const session = await getServerSession(authOptions);
     if (!session || !session.user?.email) {
-      return new Response(JSON.stringify({ message: "Unauthorized" }), {
-        status: 401,
-      });
+      return Response.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
     // 2. Get role from client request
     const { role } = await req.json();
     if (!role || !["guest", "host", "agent", "admin"].includes(role)) {
-      return new Response(JSON.stringify({ message: "Invalid role" }), {
-        status: 400,
-      });
+      return Response.json({ success: false, message: "Invalid role" }, { status: 400 });
     }
 
     // 3. Connect to MongoDB
@@ -28,55 +24,64 @@ export async function POST(req) {
     const updatedUser = await db.collection('users').findOneAndUpdate(
       { email: session.user.email },
       { $set: { role } },
-      { returnDocument: 'after', upsert: true } // Ensures the user is updated or created
+      { returnDocument: 'after', upsert: true }
     );
 
     if (!updatedUser.value) {
-      return new Response(
-        JSON.stringify({ message: "User not found or update failed" }),
+      return Response.json(
+        { success: false, message: "User not found or update failed" },
         { status: 404 }
       );
     }
 
-    return new Response(
-      JSON.stringify({
-        message: "Role updated successfully",
-        user: {
-          name: updatedUser.value.name,
-          email: updatedUser.value.email,
-          role: updatedUser.value.role,
-        },
-      }),
-      { status: 200 }
-    );
+    return Response.json({
+      success: true,
+      message: "Role updated successfully",
+      user: {
+        name: updatedUser.value.name,
+        email: updatedUser.value.email,
+        role: updatedUser.value.role,
+      },
+    });
   } catch (error) {
     console.error("User Role Update Error:", error);
     
-    // Handling specific MongoDB connection errors or timeouts
-    if (error.name === 'MongoError') {
-      return new Response(
-        JSON.stringify({ message: "Database error while updating role" }),
-        { status: 500 }
-      );
-    }
-
-    // Catch all for other errors
-    return new Response(
-      JSON.stringify({ message: "Server error while updating role" }),
+    return Response.json(
+      { success: false, message: "Server error while updating role" },
       { status: 500 }
     );
   }
 }
 
 export async function GET(req) {
-  await dbConnect();
-  const session = await getServerSession(authOptions);
-  if (!session || !session.user?.email) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+  try {
+    // Use connectToDatabase instead of dbConnect
+    const { db } = await connectToDatabase();
+    
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.email) {
+      return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    // Find user in the database
+    const user = await db.collection('users').findOne({ email: session.user.email });
+    
+    if (!user) {
+      return Response.json({ success: false, error: 'User not found' }, { status: 404 });
+    }
+    
+    return Response.json({ 
+      success: true, 
+      hasOnboarded: user.hasOnboarded,
+      user: {
+        name: user.name,
+        email: user.email,
+        role: user.role || 'guest',
+        hasOnboarded: user.hasOnboarded || false
+      }
+    });
+  } catch (error) {
+    console.error("User GET Error:", error);
+    return Response.json({ success: false, error: 'Server error' }, { status: 500 });
   }
-  const user = await User.findOne({ email: session.user.email });
-  if (!user) {
-    return new Response(JSON.stringify({ error: 'User not found' }), { status: 404 });
-  }
-  return new Response(JSON.stringify({ hasOnboarded: user.hasOnboarded }), { status: 200 });
 }
