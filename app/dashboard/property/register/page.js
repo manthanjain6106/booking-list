@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
-// This must be a React component function
 export default function PropertyRegistrationForm() {
   const { data: session, status } = useSession({ required: true });
   const router = useRouter();
@@ -23,7 +22,7 @@ export default function PropertyRegistrationForm() {
     phone2: "",
     totalRooms: "",
     pricingType: "perPerson", // Default value
-    priceValue: "",
+    // priceValue field removed as requested
   });
 
   if (status === "loading") {
@@ -61,7 +60,6 @@ export default function PropertyRegistrationForm() {
     if (!/^\d{10}$/.test(formData.phone1.trim())) return "Phone number must be 10 digits";
     if (formData.phone2.trim() && !/^\d{10}$/.test(formData.phone2.trim())) return "Alternate phone number must be 10 digits";
     if (!formData.totalRooms || formData.totalRooms <= 0) return "Total rooms must be at least 1";
-    if (!formData.priceValue || formData.priceValue <= 0) return `Price ${formData.pricingType === 'perPerson' ? 'per person' : 'per room'} must be greater than 0`;
     
     // Location validation
     if (!formData.address.trim()) return "Address is required";
@@ -101,7 +99,7 @@ export default function PropertyRegistrationForm() {
       totalRooms: Number(formData.totalRooms),
       pricing: {
         type: formData.pricingType,
-        value: Number(formData.priceValue)
+        // value field removed - will be defined per room later
       }
     };
 
@@ -206,7 +204,7 @@ export default function PropertyRegistrationForm() {
           />
         </div>
 
-        {/* Pricing Type Radio Buttons */}
+        {/* Pricing Type Radio Buttons - Only keep this section */}
         <div className="mt-4">
           <label className="block text-sm font-medium text-gray-600 mb-2">Pricing Type</label>
           <div className="flex space-x-4">
@@ -234,19 +232,7 @@ export default function PropertyRegistrationForm() {
             </label>
           </div>
         </div>
-
-        {/* Price Value Field */}
-        <div className="w-full sm:w-1/2">
-          <Input 
-            label={`Price ${formData.pricingType === 'perPerson' ? 'Per Person' : 'Per Room'}`}
-            name="priceValue" 
-            value={formData.priceValue} 
-            onChange={handleChange} 
-            type="number" 
-            min="1" 
-            required 
-          />
-        </div>
+        {/* Price Value Field removed as requested */}
 
         <h3 className="text-md font-semibold text-gray-700 mt-6">Property Location</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -280,7 +266,6 @@ export default function PropertyRegistrationForm() {
   );
 }
 
-// Define the Input component within the same file
 function Input({ label, ...props }) {
   return (
     <div>
