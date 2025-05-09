@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { addDays, startOfWeek, format } from 'date-fns';
+import Image from 'next/image';
 
 export default function HostDashboardCalendar() {
   const [date, setDate] = useState(new Date());
@@ -117,7 +118,7 @@ export default function HostDashboardCalendar() {
             {rooms.map(room => (
               <tr key={room.name}>
                 <td style={{border: '1px solid #ddd', padding: 8, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8}}>
-                  <img src={placeholderImg} alt="room" style={{width: 32, height: 32, borderRadius: 6, background: '#e5e7eb'}} />
+                  <Image src={placeholderImg} alt="room" style={{width: 32, height: 32, borderRadius: 6, background: '#e5e7eb'}} />
                   {room.name}
                 </td>
                 {weekDates.map(d => (
