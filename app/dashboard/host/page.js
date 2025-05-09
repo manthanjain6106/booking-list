@@ -81,7 +81,7 @@ export default function HostDashboard() {
               <p className="text-gray-600"><span className="font-medium">Location:</span> {property.location.address}, {property.location.city}, {property.location.state}</p>
               <p className="text-gray-600"><span className="font-medium">Total Rooms:</span> {property.totalRooms}</p>
               <p className="text-gray-600">
-                <span className="font-medium">Pricing:</span> ₹{property.pricing?.value} 
+                <span className="font-medium">Pricing:</span> &#8377;{property.pricing?.value} 
                 {property.pricing?.type === 'perPerson' ? ' per person' : ' per room'}
               </p>
             </div>

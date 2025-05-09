@@ -118,7 +118,7 @@ export default function HostDashboardCalendar() {
             {rooms.map(room => (
               <tr key={room.name}>
                 <td style={{border: '1px solid #ddd', padding: 8, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8}}>
-                  <Image src={placeholderImg} alt="room" style={{width: 32, height: 32, borderRadius: 6, background: '#e5e7eb'}} />
+                  <Image src={placeholderImg} alt="room" width={32} height={32} style={{ borderRadius: 6, background: '#e5e7eb' }} />
                   {room.name}
                 </td>
                 {weekDates.map(d => (
