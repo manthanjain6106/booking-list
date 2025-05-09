@@ -136,7 +136,7 @@ export default function HostDashboard() {
           onClick={() => router.push("/dashboard/host/bookings")}
           className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-md px-4 py-3 transition-colors flex items-center justify-between group"
         >
-          <span className="text-sm sm:text-base">View today's bookings</span>
+          <span className="text-sm sm:text-base">View today&apos;s bookings</span>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
