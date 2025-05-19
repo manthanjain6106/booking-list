@@ -57,7 +57,8 @@ export async function POST(req) {
       uniqueUrl: uniqueUrl,
       createdAt: new Date(),
       isVerified: false,
-      status: 'active'
+      status: 'active',
+      isActive: true // Ensure isActive is set to true
     });
     
     // Update user to mark onboarding as completed

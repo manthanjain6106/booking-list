@@ -1,25 +1,24 @@
 import mongoose from 'mongoose';
 
-// Check if models already exists to prevent overwriting
-const Room = mongoose.models.Room || mongoose.model('Room', new mongoose.Schema({
+const roomSchema = new mongoose.Schema({
   property: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Property',
     required: [true, 'Room must belong to a property'],
+    index: true,
   },
   name: {
     type: String,
-    required: [true, 'Room name is required'],
-    trim: true,
-  },
-  roomNumber: {
-    type: String,
-    required: [true, 'Room number is required'],
     trim: true,
   },
   category: {
     type: String,
     required: [true, 'Room category is required'],
+    trim: true,
+  },
+  roomNumber: {
+    type: String,
+    required: [true, 'Room number is required'],
     trim: true,
   },
   description: {
@@ -30,7 +29,7 @@ const Room = mongoose.models.Room || mongoose.model('Room', new mongoose.Schema(
     adults: {
       type: Number,
       required: [true, 'Adult capacity is required'],
-      min: [1, 'Room must accommodate at least 1 adult'],
+      min: 1,
     },
     children: {
       type: Number,
@@ -39,60 +38,63 @@ const Room = mongoose.models.Room || mongoose.model('Room', new mongoose.Schema(
     total: {
       type: Number,
       required: [true, 'Total capacity is required'],
-      min: [1, 'Room must have a capacity of at least 1'],
-    }
+      min: 1,
+    },
+    capacityText: {
+      type: String, // For flexible display like "5+"
+      default: '',
+    },
   },
+
+  // Flexible pricing structure
   pricing: {
-    // Base pricing
+    // Per room
     perRoom: {
-      type: Number, // Price per room
-      required: function() {
-        return !this.pricing.perPerson && !this.pricing.adultRate; // Required if neither perPerson nor adultRate is set
-      },
+      type: Number,
       min: [0, 'Price cannot be negative'],
     },
-    perPerson: {
-      type: Number, // Price per person (legacy field)
-      required: function() {
-        return !this.pricing.perRoom && !this.pricing.adultRate; // Required if neither perRoom nor adultRate is set
-      },
-      min: [0, 'Price cannot be negative'],
+    extraPersonCharge: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
-    // Enhanced child pricing fields
+    // Per person mapping
+    perPersonPrices: {
+      type: Map,
+      of: Number,
+      default: null,
+    },
+    // Per adult/child
     adultRate: {
-      type: Number, // Price per adult
-      required: function() {
-        return !this.pricing.perRoom && !this.pricing.perPerson; // Required if neither perRoom nor perPerson is set
-      },
-      min: [0, 'Adult rate cannot be negative'],
+      type: Number,
+      min: 0,
     },
     childRate: {
-      type: Number, // Price per child (5-10 years)
-      default: function() {
+      type: Number,
+      default: function () {
         return this.pricing.adultRate ? Math.floor(this.pricing.adultRate / 2) : 0;
       },
-      min: [0, 'Child rate cannot be negative'],
+      min: 0,
     },
     maxAdults: {
       type: Number,
-      default: function() {
-        return this.capacity.adults || 1;
+      default: function () {
+        return this.capacity?.adults || 1;
       },
-      min: [1, 'Room must allow at least 1 adult'],
+      min: 1,
     },
     maxChildren: {
       type: Number,
-      default: function() {
-        return this.capacity.children || 0;
+      default: function () {
+        return this.capacity?.children || 0;
       },
-      min: [0, 'Children capacity cannot be negative'],
+      min: 0,
     },
     advanceAmount: {
       type: Number,
-      required: [true, 'Advance amount is required'],
+      default: 0,
       min: [0, 'Advance amount cannot be negative'],
     },
-    // Seasonal pricing can be implemented with an array of price periods
     seasonalPricing: [{
       startDate: {
         type: Date,
@@ -102,40 +104,39 @@ const Room = mongoose.models.Room || mongoose.model('Room', new mongoose.Schema(
         type: Date,
         required: true,
       },
-      perRoom: {
-        type: Number,
-        min: [0, 'Seasonal price cannot be negative'],
-      },
-      perPerson: {
-        type: Number,
-        min: [0, 'Seasonal price cannot be negative'],
-      },
-      adultRate: {
-        type: Number,
-        min: [0, 'Seasonal adult rate cannot be negative'],
-      },
-      childRate: {
-        type: Number,
-        min: [0, 'Seasonal child rate cannot be negative'],
-      },
-    }],
+      perRoom: Number,
+      perPerson: Number,
+      adultRate: Number,
+      childRate: Number,
+    }]
   },
+
   amenities: [{
     type: String,
     trim: true,
   }],
+
   images: [{
-    type: String, // URLs to room images
+    type: String,
+    trim: true,
   }],
+
   agentCommission: {
-    type: Number, // Percentage or fixed amount
+    type: Number,
     default: 0,
     min: [0, 'Commission cannot be negative'],
   },
+
+  isAvailable: {
+    type: Boolean,
+    default: true,
+  },
+
   isActive: {
     type: Boolean,
     default: true,
   },
+
   createdAt: {
     type: Date,
     default: Date.now,
@@ -144,39 +145,57 @@ const Room = mongoose.models.Room || mongoose.model('Room', new mongoose.Schema(
     type: Date,
     default: Date.now,
   },
+
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true },
-}));
+});
 
-// Virtual populate bookings for this room
-Room.virtual('bookings', {
+// Compound index for uniqueness
+roomSchema.index({ property: 1, category: 1, roomNumber: 1 }, { unique: true });
+
+// Virtual: Bookings
+roomSchema.virtual('bookings', {
   ref: 'Booking',
   foreignField: 'room',
   localField: '_id',
 });
 
-// Virtual for calculating total price based on occupancy
-Room.virtual('calculatedPrice').get(function() {
-  // If using perRoom pricing
+// Virtual: maxGuests (based on text field)
+roomSchema.virtual('maxGuests').get(function () {
+  if (this.capacity.capacityText === '5+') return 10;
+  return this.capacity.total;
+});
+
+// Virtual: calculated price
+roomSchema.virtual('calculatedPrice').get(function () {
   if (this.pricing.perRoom) {
     return this.pricing.perRoom;
   }
-  
-  // If using new adult/child rate pricing
   if (this.pricing.adultRate) {
-    const adultTotal = this.pricing.adultRate * Math.min(this.capacity.adults, this.pricing.maxAdults || this.capacity.adults);
-    const childTotal = this.pricing.childRate * Math.min(this.capacity.children, this.pricing.maxChildren || this.capacity.children);
-    return adultTotal + childTotal;
+    const adults = Math.min(this.capacity.adults, this.pricing.maxAdults);
+    const children = Math.min(this.capacity.children, this.pricing.maxChildren);
+    return (this.pricing.adultRate * adults) + (this.pricing.childRate * children);
   }
-  
-  // If using legacy perPerson pricing
-  if (this.pricing.perPerson) {
-    return this.pricing.perPerson * this.capacity.total;
+  if (this.pricing.perPersonPrices) {
+    const key = String(this.capacity.total);
+    return this.pricing.perPersonPrices.get(key) || 0;
   }
-  
   return 0;
 });
+
+// Instance method: calculate price dynamically
+roomSchema.methods.calculatePrice = function (numAdults, numChildren) {
+  if (this.pricing.perRoom) {
+    const extraPeople = Math.max(0, (numAdults + numChildren) - this.capacity.total);
+    return this.pricing.perRoom + (this.pricing.extraPersonCharge || 0) * extraPeople;
+  }
+  const adultRate = this.pricing.adultRate || (this.pricing.perPersonPrices?.get('1')) || 0;
+  const childRate = this.pricing.childRate || Math.floor(adultRate / 2);
+  return (numAdults * adultRate) + (numChildren * childRate);
+};
+
+const Room = mongoose.models.Room || mongoose.model('Room', roomSchema);
 
 export default Room;

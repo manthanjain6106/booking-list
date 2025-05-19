@@ -1,3 +1,4 @@
+// app/dashboard/host/page.js
 "use client";
 
 import { useSession } from "next-auth/react";
