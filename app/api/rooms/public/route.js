@@ -28,21 +28,17 @@ export async function GET(req) {
     }
     
     // Build query
-    const query = {
-      propertyId: new ObjectId(propertyId),
-      isActive: true
-    };
-    
-    if (category) {
-      query.category = category;
-    }
-    
-    // Get rooms
-    const rooms = await db.collection('rooms')
-      .find(query)
+    // Try both propertyId and property fields for backward compatibility
+    let rooms = await db.collection('rooms')
+      .find({ propertyId: new ObjectId(propertyId) })
       .sort({ category: 1, roomNumber: 1 })
       .toArray();
-    
+    if (rooms.length === 0) {
+      rooms = await db.collection('rooms')
+        .find({ property: new ObjectId(propertyId) })
+        .sort({ category: 1, roomNumber: 1 })
+        .toArray();
+    }
     return NextResponse.json({ rooms });
     
   } catch (error) {

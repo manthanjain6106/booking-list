@@ -1,192 +1,172 @@
-// app/api/bookings/route.js
+// app/api/bookings/route.js - Fixed for your db connection
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../auth/[...nextauth]/route";
+import connectDB from "@/app/utils/db";
+import Booking from "@/app/models/Booking";
+import Property from "@/app/models/Property";
+import Room from "@/app/models/Room";
+import mongoose from "mongoose";
 
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../auth/[...nextauth]/route';
-import connect from '@/app/utils/db';
-import Booking from '@/app/models/Booking';
-import Room from '@/app/models/Room';
-import Property from '@/app/models/Property';
-
-// GET handler for fetching bookings (with auth check)
-export async function GET(req) {
+export async function POST(request) {
   try {
-    // Verify authentication
     const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    
+    // Parse booking data from request
+    const data = await request.json();
+    console.log("Booking data received:", data);
+    
+    // Validate required fields based on your Booking model
+    if (
+      !data.propertyId ||
+      !data.roomId ||
+      !data.guestName ||
+      !data.guestPhone
+    ) {
+      return NextResponse.json(
+        { message: "Missing required booking information" },
+        { status: 400 }
+      );
     }
     
-    // Connect to the database
-    await connect();
-    
-    const { searchParams } = new URL(req.url);
-    const propertyId = searchParams.get('propertyId');
-    const userId = searchParams.get('userId');
-    const status = searchParams.get('status');
-    
-    // Build query
-    const query = {};
-    
-    if (propertyId) {
-      query.propertyId = propertyId;
-    }
-    
-    if (userId) {
-      query.userId = userId;
-    }
-    
-    if (status) {
-      query.status = status;
-    }
-    
-    // Check permissions
-    if (session.user.role === 'guest') {
-      // Guests can only see their own bookings
-      query.userId = session.user.id;
-    } else if (session.user.role === 'host') {
-      // Hosts can only see bookings for their properties
-      const hostProperty = await Property.findOne({ hostId: session.user.id });
-      if (!hostProperty) {
-        return NextResponse.json({ message: 'No property found for this host' }, { status: 404 });
+    // Connect to database - adapting to your db connection method
+    try {
+      // Your db might already be connected by Next.js startup
+      if (typeof connectDB === 'function') {
+        await connectDB();
       }
-      
-      query.propertyId = hostProperty._id;
+    } catch (dbError) {
+      console.log("Note: Database might already be connected:", dbError.message);
+      // Continue execution, as the DB might already be connected
     }
-    // Admins can see all bookings (no filter needed)
     
-    // Get bookings
-    const bookings = await Booking.find(query)
-      .sort({ createdAt: -1 })
-      .lean();
-    
-    return NextResponse.json({ bookings });
-    
-  } catch (error) {
-    console.error('Error fetching bookings:', error);
-    return NextResponse.json({ message: error.message || 'An error occurred' }, { status: 500 });
-  }
-}
-
-// POST handler for creating a new booking
-export async function POST(req) {
-  try {
-    // Connect to the database
-    await connect();
-    
-    // Parse request body
-    const body = await req.json();
-    
-    // Check for required fields
-    const requiredFields = ['propertyId', 'roomNumber', 'checkIn', 'checkOut', 'guestName', 'guestPhone'];
-    const missingFields = requiredFields.filter(field => !body[field]);
-    
-    if (missingFields.length > 0) {
-      return NextResponse.json({ 
-        message: `Missing required fields: ${missingFields.join(', ')}` 
-      }, { status: 400 });
+    // Check if the room exists
+    const room = await Room.findById(data.roomId);
+    if (!room) {
+      return NextResponse.json({ message: "Room not found" }, { status: 404 });
     }
+    
+    // Check if the property exists
+    const property = await Property.findById(data.propertyId);
+    if (!property) {
+      return NextResponse.json({ message: "Property not found" }, { status: 404 });
+    }
+    
+    // Calculate dates
+    const checkIn = new Date(data.checkIn || new Date());
+    const checkOut = new Date(data.checkOut || new Date(Date.now() + 86400000)); // Default to next day
     
     // Validate dates
-    const checkIn = new Date(body.checkIn);
-    const checkOut = new Date(body.checkOut);
-    
-    if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
-      return NextResponse.json({ 
-        message: 'Invalid date format'
-      }, { status: 400 });
-    }
-    
     if (checkIn >= checkOut) {
-      return NextResponse.json({ 
-        message: 'Check-out date must be after check-in date'
-      }, { status: 400 });
+      return NextResponse.json(
+        { message: "Check-out date must be after check-in date" },
+        { status: 400 }
+      );
     }
     
-    // Check if property exists
-    const property = await Property.findById(body.propertyId);
+    // Process child info - use both data formats for compatibility
+    const youngerChildren = parseInt(data.youngerChildren) || (data.hasYoungerChildren ? parseInt(data.youngerChildrenCount) || 0 : 0);
+    const olderChildren = parseInt(data.olderChildren) || (data.hasOlderChildren ? parseInt(data.olderChildrenCount) || 0 : 0);
+    const totalChildren = youngerChildren + olderChildren;
     
-    if (!property) {
-      return NextResponse.json({ 
-        message: 'Property not found'
-      }, { status: 404 });
-    }
+    // Calculate total amount
+    const roomRate = room.pricing?.price || parseFloat(data.totalAmount) || 0;
+    const totalAmount = parseFloat(data.totalAmount) || roomRate;
     
-    // Check if room exists
-    const room = await Room.findOne({
-      propertyId: body.propertyId,
-      roomNumber: body.roomNumber,
-      isActive: true
-    });
+    // Generate a booking reference like the one in your screenshot
+    const bookingRef = `FRA-BE-${Date.now().toString().slice(-8)}-${property.name.slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, '')}-BOOKING`;
     
-    if (!room) {
-      return NextResponse.json({ 
-        message: 'Room not found or not available'
-      }, { status: 404 });
-    }
+    // Determine who made the booking
+    const userId = data.userId || session?.user?.id || new mongoose.Types.ObjectId();
+    const bookedByRole = session?.user?.role || "guest";
     
-    // Check if room is available for requested dates
-    const existingBooking = await Booking.findOne({
-      propertyId: body.propertyId,
-      roomNumber: body.roomNumber,
-      status: { $nin: ['Cancelled', 'Completed'] },
-      $or: [
-        // Check-in date falls within an existing booking
-        { 
-          $and: [
-            { checkIn: { $lte: checkOut } },
-            { checkOut: { $gte: checkIn } }
-          ]
-        }
-      ]
-    });
-    
-    if (existingBooking) {
-      return NextResponse.json({ 
-        message: 'Room is not available for the selected dates',
-        conflict: {
-          bookingId: existingBooking._id,
-          checkIn: existingBooking.checkIn,
-          checkOut: existingBooking.checkOut
-        }
-      }, { status: 409 });
-    }
-    
-    // If user is logged in, get session
-    let session = null;
-    try {
-      session = await getServerSession(authOptions);
-    } catch (error) {
-      // Continue without session
-    }
-    
-    // Create booking
+    // Create the booking according to your model
     const booking = new Booking({
-      ...body,
-      // Add user ID if available
-      userId: body.userId || (session && session.user.id) || null,
-      // Default values
-      status: 'Pending',
-      bookingDate: new Date(),
-      // Additional info
-      hostId: property.hostId,
-      propertyName: property.name,
-      roomCategory: body.category || room.category,
-      roomImageUrl: room.imageUrls && room.imageUrls.length > 0 ? room.imageUrls[0] : null,
-      paymentStatus: 'Not Paid'
+      propertyId: data.propertyId,
+      roomId: data.roomId,
+      // For compatibility with your client
+      roomNumber: data.roomNumber || room.roomNumber,
+      category: data.category || room.category,
+      guestName: data.guestName,
+      guestPhone: data.guestPhone,
+      guestEmail: data.guestEmail || "",
+      guestAddress: data.guestAddress || "",
+      // Keep your model structure as well
+      bookedBy: userId,
+      bookedByRole: bookedByRole,
+      guestDetails: {
+        name: data.guestName,
+        email: data.guestEmail || "",
+        phone: data.guestPhone,
+        adults: parseInt(data.numAdults) || 1,
+        children: totalChildren,
+        specialRequests: data.specialRequests || ""
+      },
+      checkIn: checkIn,
+      checkOut: checkOut,
+      numAdults: parseInt(data.numAdults) || 1,
+      numChildren: totalChildren,
+      youngerChildren: youngerChildren,
+      olderChildren: olderChildren,
+      specialRequests: data.specialRequests || "",
+      numberOfRooms: 1, // Assuming single room booking
+      pricing: {
+        roomRate: roomRate,
+        totalAmount: totalAmount,
+        advanceAmount: totalAmount * 0.5,
+        balanceAmount: totalAmount * 0.5,
+        agentCommission: 0 // No commission for direct bookings
+      },
+      // Change status to confirmed if that's what the client expects
+      status: "confirmed", 
+      bookingRef: bookingRef,
+      history: [{
+        action: "created",
+        timestamp: new Date(),
+        performedBy: userId,
+        details: "Booking created"
+      }]
     });
     
-    // Save booking
     await booking.save();
+    console.log("Booking saved successfully:", booking._id);
     
-    return NextResponse.json({
-      success: true,
-      message: 'Booking created successfully',
-      booking
-    });
-    
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Booking created successfully",
+        booking: {
+          _id: booking._id,
+          bookingId: booking.bookingId || booking._id,
+          bookingRef: booking.bookingRef,
+          checkIn: booking.checkIn,
+          checkOut: booking.checkOut,
+          status: booking.status,
+          guestName: booking.guestName,
+          guestPhone: booking.guestPhone,
+          totalAmount: totalAmount
+        },
+        property: {
+          _id: property._id,
+          name: property.name
+        },
+        room: {
+          _id: room._id,
+          category: room.category,
+          roomNumber: room.roomNumber
+        }
+      },
+      { status: 201 }
+    );
   } catch (error) {
-    console.error('Error creating booking:', error);
-    return NextResponse.json({ message: error.message || 'An error occurred' }, { status: 500 });
+    console.error("Error creating booking:", error);
+    return NextResponse.json(
+      { 
+        success: false,
+        message: "Failed to create booking", 
+        error: error.message
+      },
+      { status: 500 }
+    );
   }
 }

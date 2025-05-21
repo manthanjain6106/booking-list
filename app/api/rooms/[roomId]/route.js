@@ -1,95 +1,37 @@
-import { connectToDatabase } from "@/app/utils/db";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { getServerSession } from "next-auth";
-import { ObjectId } from "mongodb";
+// app/api/rooms/[roomId]/route.js
+import { dbConnect } from "@/app/utils/mongoose";
+import Room from "@/app/models/Room";
 
-export async function DELETE(req, { params }) {
+export async function GET(request, context) {
   try {
+    await dbConnect();
+    // Await params if it's a Promise (Next.js 14+)
+    const params = context?.params && typeof context.params.then === 'function' ? await context.params : context.params;
     const { roomId } = params;
     
-    if (!roomId || !ObjectId.isValid(roomId)) {
-      return Response.json({ success: false, message: "Invalid room ID" }, { status: 400 });
-    }
+    console.log("API: Fetching room with ID:", roomId);
     
-    // Check authentication
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return Response.json({ success: false, message: "Unauthorized" }, { status: 401 });
-    }
-
-    // Connect to the database
-    const { db } = await connectToDatabase();
-    
-    // Find the room
-    const room = await db.collection('rooms').findOne({ 
-      _id: new ObjectId(roomId) 
-    });
+    const room = await Room.findById(roomId);
     
     if (!room) {
-      return Response.json({ 
-        success: false, 
-        message: "Room not found" 
-      }, { status: 404 });
+      console.error("API: Room not found with ID:", roomId);
+      return new Response(JSON.stringify({ message: "Room not found" }), { 
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
-
-    // Verify the property belongs to this host
-    const hostUser = await db.collection('users').findOne({ email: session.user.email });
-    if (!hostUser) {
-      return Response.json({ success: false, message: "User not found" }, { status: 404 });
-    }
-
-    const property = await db.collection('properties').findOne({ 
-      _id: new ObjectId(room.propertyId) 
+    
+    console.log("API: Room found:", room.category, room.roomNumber);
+    
+    return new Response(JSON.stringify({ room }), { 
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
     });
-    
-    if (!property) {
-      return Response.json({ success: false, message: "Property not found" }, { status: 404 });
-    }
-
-    if (property.host.toString() !== hostUser._id.toString() && hostUser.role !== 'admin') {
-      return Response.json({ 
-        success: false, 
-        message: "You do not have permission to delete rooms for this property" 
-      }, { status: 403 });
-    }
-
-    // Check if room has active bookings
-    const activeBookings = await db.collection('bookings').countDocuments({
-      roomId: new ObjectId(roomId),
-      status: { $in: ['confirmed', 'checked-in'] }
-    });
-    
-    if (activeBookings > 0) {
-      return Response.json({ 
-        success: false, 
-        message: "Cannot delete room with active bookings" 
-      }, { status: 400 });
-    }
-    
-    // Delete the room
-    const result = await db.collection('rooms').deleteOne({ 
-      _id: new ObjectId(roomId) 
-    });
-    
-    if (result.deletedCount === 0) {
-      return Response.json({ 
-        success: false, 
-        message: "Failed to delete room" 
-      }, { status: 500 });
-    }
-    
-    return Response.json({
-      success: true,
-      message: "Room deleted successfully"
-    });
-    
   } catch (error) {
-    console.error("Room deletion error:", error);
-    return Response.json({
-      success: false,
-      message: error.message || "Failed to delete room"
-    }, {
-      status: 500
+    console.error("API: Error fetching room:", error);
+    return new Response(JSON.stringify({ message: error.message }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
     });
   }
 }

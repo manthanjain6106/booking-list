@@ -1,19 +1,19 @@
 import mongoose from 'mongoose';
 
-// Check if models already exists to prevent overwriting
-const Booking = mongoose.models.Booking || mongoose.model('Booking', new mongoose.Schema({
+// Define the schema separately
+const BookingSchema = new mongoose.Schema({
   bookingId: {
     type: String,
     required: true,
     unique: true,
     // Generate a unique booking ID (BID)
   },
-  property: {
+  propertyId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Property',
     required: [true, 'Booking must belong to a property'],
   },
-  room: {
+  roomId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Room',
     required: [true, 'Booking must be for a room'],
@@ -103,8 +103,8 @@ const Booking = mongoose.models.Booking || mongoose.model('Booking', new mongoos
   // Booking status
   status: {
     type: String,
-    enum: ['confirmed', 'checked-in', 'checked-out', 'cancelled', 'no-show'],
-    default: 'confirmed',
+    enum: ['pending', 'confirmed', 'checked-in', 'checked-out', 'cancelled', 'no-show', 'declined'],
+    default: 'pending',
   },
   // Payment details
   payment: {
@@ -145,10 +145,10 @@ const Booking = mongoose.models.Booking || mongoose.model('Booking', new mongoos
   },
 }, {
   timestamps: true,
-}));
+});
 
 // Pre-save middleware to generate a unique booking ID if not already present
-Booking.pre('save', async function(next) {
+BookingSchema.pre('save', async function(next) {
   if (!this.bookingId) {
     // Generate a booking ID: BID-[YEAR][MONTH][DAY]-[RANDOM 4 DIGITS]
     const date = new Date();
@@ -161,5 +161,8 @@ Booking.pre('save', async function(next) {
   }
   next();
 });
+
+// Use existing model if already compiled, else create new
+const Booking = mongoose.models.Booking || mongoose.model('Booking', BookingSchema);
 
 export default Booking;

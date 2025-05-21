@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import connect from '@/app/utils/db';
+import { connectToDatabase } from '@/app/utils/db';
 import Room from '@/app/models/Room';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,9 +11,11 @@ import { promises as fsPromises } from 'fs';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import mongoose from 'mongoose';
+import { ObjectId } from 'mongodb';
 
 // Handler for multipart/form-data with images in Next.js App Router
 export async function POST(req) {
+  await ensureMongooseConnected();
   try {
     // Verify authentication
     const session = await getServerSession(authOptions);
@@ -22,7 +24,7 @@ export async function POST(req) {
     }
 
     // Connect to the database
-    await connect();
+    const { db } = await connectToDatabase();
     
     // Using a FormData approach for Next.js App Router
     const formData = await req.formData();
@@ -43,17 +45,48 @@ export async function POST(req) {
     // Process images and update room data with image URLs
     const processedRooms = await processRoomsWithImages(rooms, formData);
     
-    // Use bulk operations for efficiency
+    // Map imageUrls to images and ensure price/calculatedTotalPrice are included
     const bulkOps = processedRooms.map(room => {
-      // Check if room already exists
+      // Accept both 'property' and 'propertyId' from frontend
+      let { propertyId, property, imageUrls, price, calculatedTotalPrice, extraPersonCharge, perPersonPrices, adultRate, childRate, numAdults, numChildren, advanceAmount, ...rest } = room;
+      // Prefer propertyId, fallback to property
+      const propertyObjId = propertyId ? new ObjectId(propertyId) : (property ? new ObjectId(property) : undefined);
+      // Remove any nested updates to capacity if present
+      if (rest.capacity && (rest['capacity.adults'] || rest['capacity.children'] || rest['capacity.total'])) {
+        delete rest['capacity.adults'];
+        delete rest['capacity.children'];
+        delete rest['capacity.total'];
+      }
+      // Build pricing object
+      const pricing = { ...room.pricing };
+      if (typeof price !== 'undefined' && price !== null) pricing.perRoom = price;
+      if (typeof extraPersonCharge !== 'undefined' && extraPersonCharge !== null) pricing.extraPersonCharge = extraPersonCharge;
+      if (typeof perPersonPrices !== 'undefined' && perPersonPrices !== null) pricing.perPersonPrices = perPersonPrices ? new Map(Object.entries(perPersonPrices)) : null;
+      if (typeof adultRate !== 'undefined' && adultRate !== null) pricing.adultRate = adultRate;
+      if (typeof childRate !== 'undefined' && childRate !== null) pricing.childRate = childRate;
+      if (typeof advanceAmount !== 'undefined' && advanceAmount !== null) pricing.advanceAmount = advanceAmount;
+      // Remove undefined/null fields from pricing
+      Object.keys(pricing).forEach(key => {
+        if (pricing[key] === undefined || pricing[key] === null) {
+          delete pricing[key];
+        }
+      });
+      // Prepare update payload
+      const updatePayload = {
+        ...rest,
+        property: propertyObjId, // Always set 'property' field
+        ...(imageUrls ? { images: imageUrls } : {}),
+        ...(Object.keys(pricing).length > 0 ? { pricing } : {}),
+        ...(typeof calculatedTotalPrice !== 'undefined' ? { calculatedTotalPrice } : {})
+      };
       return {
         updateOne: {
-          filter: { 
-            propertyId: room.propertyId,
+          filter: {
+            property: propertyObjId, // Always use 'property' field
             category: room.category,
-            roomNumber: room.roomNumber 
+            roomNumber: room.roomNumber
           },
-          update: room,
+          update: { $set: updatePayload },
           upsert: true // Create if doesn't exist
         }
       };
@@ -120,6 +153,17 @@ async function processRoomsWithImages(rooms, formData) {
     
     return room;
   }));
+}
+
+// Ensure Mongoose is connected before using Mongoose models
+async function ensureMongooseConnected() {
+  if (mongoose.connection.readyState === 0) {
+    await mongoose.connect(process.env.MONGODB_URI, {
+      dbName: process.env.MONGODB_DB,
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+  }
 }
 
 // Helper function to ensure directory exists

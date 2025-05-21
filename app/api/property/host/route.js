@@ -26,8 +26,9 @@ export async function GET() {
     if (!property) {
       return Response.json({ 
         message: "No property found for this host", 
-        property: null
-      }, { status: 404 });
+        property: null,
+        success: true
+      }, { status: 200 });
     }
 
     return Response.json({ 

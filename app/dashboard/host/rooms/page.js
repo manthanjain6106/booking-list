@@ -125,10 +125,7 @@ export default function RoomManagement() {
   };
 
   const handleImageUpload = (e) => {
-    // Handle multiple image uploads
     const files = Array.from(e.target.files);
-    // In a real implementation, you would upload these to storage
-    // and get back URLs. For now, we'll just store the File objects
     setFormData({ ...formData, images: files });
   };
 
@@ -203,7 +200,6 @@ export default function RoomManagement() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     setIsSubmitting(true);
     setError("");
 
@@ -213,25 +209,21 @@ export default function RoomManagement() {
       setIsSubmitting(false);
       return;
     }
-
     if (property.pricing.type === "perRoom" && !formData.price) {
       setError("Room price is required");
       setIsSubmitting(false);
       return;
     }
-
     if (property.pricing.type === "perPerson" && !formData.adultRate) {
       setError("Adult rate is required");
       setIsSubmitting(false);
       return;
     }
-
     if (!formData.roomNumbers.every(room => room.trim())) {
       setError("All room numbers/names are required");
       setIsSubmitting(false);
       return;
     }
-
     // Check for duplicate room numbers
     const uniqueRoomNumbers = new Set(formData.roomNumbers);
     if (uniqueRoomNumbers.size !== formData.roomNumbers.length) {
@@ -239,64 +231,102 @@ export default function RoomManagement() {
       setIsSubmitting(false);
       return;
     }
-
     try {
-      // Create payload for each room
-      const roomPayloads = formData.roomNumbers.map(roomNumber => ({
-        propertyId: property._id,
-        category: selectedCategory || formData.categoryName,
-        roomNumber,
-        capacity: formData.capacity,
-        
-        // Handle perRoom pricing
-        price: property.pricing.type === "perRoom" ? Number(formData.price) : null,
-        extraPersonCharge: property.pricing.type === "perRoom" && formData.extraPersonCharge ? 
-          Number(formData.extraPersonCharge) : null,
-        
-        // Handle perPerson pricing with adult and child rates
-        perPersonPrices: property.pricing.type === "perPerson" ? {
-          1: Number(formData.adultRate) || 0,
-          2: Number(formData.adultRate) * 2 || 0,
-          3: Number(formData.adultRate) * 3 || 0
-        } : null,
-        
-        // Add new child pricing fields
-        adultRate: property.pricing.type === "perPerson" ? Number(formData.adultRate) || 0 : null,
-        childRate: property.pricing.type === "perPerson" ? Number(formData.childRate) || 0 : null,
-        numAdults: property.pricing.type === "perPerson" ? Number(formData.numAdults) || 1 : null,
-        numChildren: property.pricing.type === "perPerson" ? Number(formData.numChildren) || 0 : null,
-        
-        // Other fields
-        amenities: formData.amenities,
-        agentCommission: formData.agentCommission ? Number(formData.agentCommission) : null,
-        advanceAmount: formData.advanceAmount ? Number(formData.advanceAmount) : null,
-      }));
-
-      // Send API request to save rooms
-      const res = await fetch("/api/rooms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rooms: roomPayloads }),
+      // Prepare FormData for /api/rooms/with-images
+      const fd = new FormData();
+      // Prepare room payloads, referencing image keys
+      let imageKeys = [];
+      let roomPayloads = formData.roomNumbers.map((roomNumber, idx) => {
+        let images = [];
+        if (formData.images && formData.images.length > 0) {
+          images = formData.images.map((file, i) => `room${idx}_img${i}`);
+        }
+        imageKeys = imageKeys.concat(images.map((key, i) => ({ key, file: formData.images[i] })));
+        // Calculate total price for each room
+        let calculatedTotalPrice = null;
+        if (property.pricing.type === "perRoom") {
+          calculatedTotalPrice = formData.price !== "" ? Number(formData.price) : null;
+        } else {
+          const adultRate = Number(formData.adultRate) || 0;
+          const childRate = Number(formData.childRate) || 0;
+          const numAdults = Number(formData.numAdults) || 1;
+          const numChildren = Number(formData.numChildren) || 0;
+          calculatedTotalPrice = (numAdults * adultRate) + (numChildren * childRate);
+        }
+        return {
+          property: property._id, // FIX: use 'property' instead of 'propertyId'
+          category: selectedCategory || formData.categoryName,
+          roomNumber,
+          capacity: {
+            adults: Number(formData.numAdults) || 1,
+            children: Number(formData.numChildren) || 0,
+            total: (Number(formData.numAdults) || 1) + (Number(formData.numChildren) || 0),
+            capacityText: "",
+          },
+          price: property.pricing.type === "perRoom" && formData.price !== "" ? Number(formData.price) : null,
+          extraPersonCharge:
+            property.pricing.type === "perRoom" && formData.extraPersonCharge
+              ? Number(formData.extraPersonCharge)
+              : null,
+          perPersonPrices:
+            property.pricing.type === "perPerson"
+              ? {
+                  1: Number(formData.adultRate) || 0,
+                  2: Number(formData.adultRate) * 2 || 0,
+                  3: Number(formData.adultRate) * 3 || 0,
+                }
+              : null,
+          adultRate:
+            property.pricing.type === "perPerson"
+              ? Number(formData.adultRate) || 0
+              : null,
+          childRate:
+            property.pricing.type === "perPerson"
+              ? Number(formData.childRate) || 0
+              : null,
+          numAdults:
+            property.pricing.type === "perPerson"
+              ? Number(formData.numAdults) || 1
+              : null,
+          numChildren:
+            property.pricing.type === "perPerson"
+              ? Number(formData.numChildren) || 0
+              : null,
+          amenities: formData.amenities,
+          agentCommission: formData.agentCommission
+            ? Number(formData.agentCommission)
+            : null,
+          advanceAmount: formData.advanceAmount
+            ? Number(formData.advanceAmount)
+            : null,
+          images, // array of keys for this room
+          calculatedTotalPrice
+        };
       });
-
+      // Debug: log the payload before sending
+      console.log('Room payloads:', roomPayloads);
+      // Attach all images to FormData
+      imageKeys.forEach(({ key, file }) => {
+        if (file) fd.append(key, file);
+      });
+      // Attach room data as JSON
+      fd.append('roomData', JSON.stringify({ rooms: roomPayloads }));
+      // Send to /api/rooms/with-images
+      const res = await fetch("/api/rooms/with-images", {
+        method: "POST",
+        body: fd,
+      });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.message || "Failed to save rooms");
       }
-
-      // Handle image uploads separately (in a real implementation)
-      // For each room, you would upload images and associate them with the room ID
-
       alert("Rooms saved successfully!");
-      
       // Refresh room data
       const refreshRes = await fetch(`/api/rooms?propertyId=${property._id}`);
       if (refreshRes.ok) {
         const refreshData = await refreshRes.json();
         setRooms(refreshData.rooms || []);
       }
-      
-      // Reset form and selection
       setSelectedCategory("");
       resetForm();
     } catch (err) {
@@ -338,18 +368,41 @@ export default function RoomManagement() {
       
       // Remove the deleted room from the local state
       setRooms(rooms.filter(room => room._id !== roomToDelete._id));
-      
+
+      // Refresh property and rooms from backend
+      try {
+        const propertyRes = await fetch("/api/property/host");
+        if (propertyRes.ok) {
+          const propertyData = await propertyRes.json();
+          if (propertyData.property) {
+            setProperty(propertyData.property);
+            const roomsRes = await fetch(`/api/rooms?propertyId=${propertyData.property._id}`);
+            if (roomsRes.ok) {
+              const roomsData = await roomsRes.json();
+              setRooms(roomsData.rooms || []);
+            } else {
+              setError("Could not refresh rooms after deletion.");
+            }
+          } else {
+            setProperty(null);
+            setRooms([]);
+            setCategories([]);
+          }
+        } else {
+          setError("Could not refresh property after deletion.");
+        }
+      } catch (refreshError) {
+        setError("An error occurred while refreshing data after deletion.");
+      }
+
       // Close the modal
       closeDeleteModal();
-      
       // Show success message
       alert("Room deleted successfully!");
-      
       // Check if we need to update categories
       const remainingRoomsInCategory = rooms.filter(
         room => room.category === roomToDelete.category && room._id !== roomToDelete._id
       );
-      
       if (remainingRoomsInCategory.length === 0) {
         setCategories(categories.filter(cat => cat !== roomToDelete.category));
       }
@@ -364,13 +417,12 @@ export default function RoomManagement() {
   // Helper function to calculate total price for a room
   const calculateTotalPrice = (room) => {
     if (property?.pricing?.type === "perRoom") {
-      return room.price || 0;
+      return room.pricing?.price || 0;
     } else {
-      const adultRate = room.adultRate || (room.perPersonPrices && room.perPersonPrices[1]) || 0;
-      const childRate = room.childRate || Math.floor((room.perPersonPrices && room.perPersonPrices[1]) / 2) || 0;
+      const adultRate = room.pricing?.adultRate || (room.pricing?.perPersonPrices && room.pricing.perPersonPrices[1]) || 0;
+      const childRate = room.pricing?.childRate || Math.floor((room.pricing?.perPersonPrices && room.pricing.perPersonPrices[1]) / 2) || 0;
       const numAdults = room.numAdults || 1;
       const numChildren = room.numChildren || 0;
-      
       return (numAdults * adultRate) + (numChildren * childRate);
     }
   };
@@ -454,10 +506,10 @@ export default function RoomManagement() {
                       </div>
                       <div className="space-y-1 text-sm text-gray-500">
                         <div><span className="font-medium text-gray-700">Category:</span> {room.category}</div>
-                        <div><span className="font-medium text-gray-700">Capacity:</span> {room.capacity} {parseInt(room.capacity) === 1 ? 'Person' : 'People'}</div>
+                        <div><span className="font-medium text-gray-700">Capacity:</span> {room.capacity?.total} {room.capacity?.total === 1 ? 'Person' : 'People'}</div>
                         
                         {property.pricing.type === "perRoom" ? (
-                          <div><span className="font-medium text-gray-700">Price:</span> ₹{room.price}</div>
+                          <div><span className="font-medium text-gray-700">Price:</span> ₹{room.pricing?.price}</div>
                         ) : (
                           <div className="space-y-1">
                             {/* Total Price Calculation */}
@@ -465,10 +517,9 @@ export default function RoomManagement() {
                               <span className="font-medium text-gray-700">Total Room Price:</span>
                               <span className="font-bold text-green-600">₹{calculateTotalPrice(room).toLocaleString()}</span>
                             </div>
-                            
                             <div className="border-t border-gray-100 pt-2 text-xs text-gray-600">
-                              <div><span className="font-medium">Adults:</span> {room.numAdults || 1} × ₹{room.adultRate || (room.perPersonPrices && room.perPersonPrices[1]) || 0} = ₹{((room.numAdults || 1) * (room.adultRate || (room.perPersonPrices && room.perPersonPrices[1]) || 0)).toLocaleString()}</div>
-                              <div><span className="font-medium">Children:</span> {room.numChildren || 0} × ₹{room.childRate || Math.floor((room.perPersonPrices && room.perPersonPrices[1])/2) || 0} = ₹{((room.numChildren || 0) * (room.childRate || Math.floor((room.perPersonPrices && room.perPersonPrices[1])/2) || 0)).toLocaleString()}</div>
+                              <div><span className="font-medium">Adults:</span> {room.numAdults || 1} × ₹{room.pricing?.adultRate || (room.pricing?.perPersonPrices && room.pricing.perPersonPrices[1]) || 0} = ₹{((room.numAdults || 1) * (room.pricing?.adultRate || (room.pricing?.perPersonPrices && room.pricing.perPersonPrices[1]) || 0)).toLocaleString()}</div>
+                              <div><span className="font-medium">Children:</span> {room.numChildren || 0} × ₹{room.pricing?.childRate || Math.floor((room.pricing?.perPersonPrices && room.pricing.perPersonPrices[1]) / 2) || 0} = ₹{((room.numChildren || 0) * (room.pricing?.childRate || Math.floor((room.pricing?.perPersonPrices && room.pricing.perPersonPrices[1]) / 2) || 0)).toLocaleString()}</div>
                             </div>
                           </div>
                         )}
@@ -519,12 +570,12 @@ export default function RoomManagement() {
                           {room.category}
                         </td>
                         <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {room.capacity} {parseInt(room.capacity) === 1 ? 'Person' : 'People'}
+                          {room.capacity?.total} {room.capacity?.total === 1 ? 'Person' : 'People'}
                         </td>
                         
                         {property.pricing.type === "perRoom" ? (
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            ₹{room.price}
+                            ₹{room.pricing?.price}
                           </td>
                         ) : (
                           <td className="px-4 sm:px-6 py-4 text-sm text-gray-500">
@@ -536,8 +587,8 @@ export default function RoomManagement() {
                               </div>
                               
                               <div className="border-t border-gray-100 pt-2 text-xs text-gray-600">
-                                <div><span className="font-medium">Adults:</span> {room.numAdults || 1} × ₹{room.adultRate || (room.perPersonPrices && room.perPersonPrices[1]) || 0} = ₹{((room.numAdults || 1) * (room.adultRate || (room.perPersonPrices && room.perPersonPrices[1]) || 0)).toLocaleString()}</div>
-                                <div><span className="font-medium">Children:</span> {room.numChildren || 0} × ₹{room.childRate || Math.floor((room.perPersonPrices && room.perPersonPrices[1])/2) || 0} = ₹{((room.numChildren || 0) * (room.childRate || Math.floor((room.perPersonPrices && room.perPersonPrices[1])/2) || 0)).toLocaleString()}</div>
+                                <div><span className="font-medium">Adults:</span> {room.numAdults || 1} × ₹{room.pricing?.adultRate || (room.pricing?.perPersonPrices && room.pricing.perPersonPrices[1]) || 0} = ₹{((room.numAdults || 1) * (room.pricing?.adultRate || (room.pricing?.perPersonPrices && room.pricing.perPersonPrices[1]) || 0)).toLocaleString()}</div>
+                                <div><span className="font-medium">Children:</span> {room.numChildren || 0} × ₹{room.pricing?.childRate || Math.floor((room.pricing?.perPersonPrices && room.pricing.perPersonPrices[1])/2) || 0} = ₹{((room.numChildren || 0) * (room.pricing?.childRate || Math.floor((room.pricing?.perPersonPrices && room.pricing.perPersonPrices[1])/2) || 0)).toLocaleString()}</div>
                               </div>
                             </div>
                           </td>
@@ -557,7 +608,7 @@ export default function RoomManagement() {
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
+                            </svg>
                               Edit
                             </button>
                             <button 
@@ -566,7 +617,7 @@ export default function RoomManagement() {
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
+                            </svg>
                               Delete
                             </button>
                           </div>
@@ -676,6 +727,7 @@ export default function RoomManagement() {
               {/* Pricing Section - Based on property pricing type */}
               {property.pricing.type === "perRoom" ? (
                 <div>
+                  {/* Only show this section for perRoom pricing */}
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Rate per Room
                   </label>
@@ -692,7 +744,6 @@ export default function RoomManagement() {
                       required
                     />
                   </div>
-                  
                   {/* Extra Person Charge - Only for "perRoom" pricing */}
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -714,16 +765,15 @@ export default function RoomManagement() {
                 </div>
               ) : (
                 <div>
+                  {/* Only show this section for perPerson pricing */}
                   <label className="block text-sm font-medium text-gray-700 mb-3">
                     Per Person Pricing
                   </label>
-                  
                   <div className="bg-indigo-50 p-4 rounded-lg mb-4">
                     <p className="text-sm text-indigo-800">
                       Set the price per adult. Child rate (5-10 years) is automatically calculated at half the adult rate.
                     </p>
                   </div>
-                  
                   {/* Adult Rate */}
                   <div className="mb-4 border-b border-gray-100 pb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -738,12 +788,10 @@ export default function RoomManagement() {
                           const adultRate = e.target.value;
                           // Calculate child rate as half of adult rate
                           const childRate = adultRate ? Math.floor(Number(adultRate) / 2) : "";
-                          
                           setFormData({
                             ...formData,
                             adultRate,
                             childRate,
-                            // Update compatibility with existing structure
                             perPersonPrices: {
                               1: adultRate,
                               2: adultRate * 2,
@@ -758,7 +806,6 @@ export default function RoomManagement() {
                       />
                     </div>
                   </div>
-                  
                   {/* Child Rate Display (calculated field) */}
                   <div className="mb-4 border-b border-gray-100 pb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -775,7 +822,6 @@ export default function RoomManagement() {
                       <span className="absolute right-3 text-xs text-gray-500">(Half of adult rate)</span>
                     </div>
                   </div>
-                  
                   {/* Number of Adults */}
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -786,7 +832,6 @@ export default function RoomManagement() {
                       value={formData.numAdults || "1"}
                       onChange={(e) => {
                         const numAdults = Math.max(1, parseInt(e.target.value) || 1); // Minimum 1 adult
-                        
                         setFormData({
                           ...formData,
                           numAdults
@@ -798,7 +843,6 @@ export default function RoomManagement() {
                       required
                     />
                   </div>
-                  
                   {/* Number of Children */}
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -809,7 +853,6 @@ export default function RoomManagement() {
                       value={formData.numChildren || "0"}
                       onChange={(e) => {
                         const numChildren = Math.max(0, parseInt(e.target.value) || 0);
-                        
                         setFormData({
                           ...formData,
                           numChildren
@@ -820,23 +863,19 @@ export default function RoomManagement() {
                       className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
-                  
                   {/* Total Price Calculation */}
                   <div className="bg-green-50 p-4 rounded-lg border border-green-100 mb-4">
                     <h3 className="text-sm font-medium text-gray-700 mb-3">Price Breakdown</h3>
-                    
                     <div className="space-y-2 mb-3">
                       <div className="flex justify-between text-sm">
                         <span>Adults: {formData.numAdults || 1} × ₹{formData.adultRate || 0}</span>
                         <span>₹{(formData.numAdults || 1) * (formData.adultRate || 0)}</span>
                       </div>
-                      
                       <div className="flex justify-between text-sm">
                         <span>Children: {formData.numChildren || 0} × ₹{formData.childRate || 0}</span>
                         <span>₹{(formData.numChildren || 0) * (formData.childRate || 0)}</span>
                       </div>
                     </div>
-                    
                     <div className="border-t border-green-200 pt-2 flex justify-between items-center">
                       <span className="font-medium text-gray-700">Total Room Price:</span>
                       <span className="text-lg font-bold text-green-700">

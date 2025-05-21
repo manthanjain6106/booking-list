@@ -71,23 +71,14 @@ const roomSchema = new mongoose.Schema({
     },
     childRate: {
       type: Number,
-      default: function () {
-        return this.pricing.adultRate ? Math.floor(this.pricing.adultRate / 2) : 0;
-      },
       min: 0,
     },
     maxAdults: {
       type: Number,
-      default: function () {
-        return this.capacity?.adults || 1;
-      },
       min: 1,
     },
     maxChildren: {
       type: Number,
-      default: function () {
-        return this.capacity?.children || 0;
-      },
       min: 0,
     },
     advanceAmount: {
@@ -164,22 +155,24 @@ roomSchema.virtual('bookings', {
 
 // Virtual: maxGuests (based on text field)
 roomSchema.virtual('maxGuests').get(function () {
+  if (!this.capacity) return 0;
   if (this.capacity.capacityText === '5+') return 10;
-  return this.capacity.total;
+  return this.capacity.total || 0;
 });
 
 // Virtual: calculated price
 roomSchema.virtual('calculatedPrice').get(function () {
+  if (!this.pricing || !this.capacity) return 0;
   if (this.pricing.perRoom) {
     return this.pricing.perRoom;
   }
   if (this.pricing.adultRate) {
-    const adults = Math.min(this.capacity.adults, this.pricing.maxAdults);
-    const children = Math.min(this.capacity.children, this.pricing.maxChildren);
+    const adults = Math.min(this.capacity.adults || 0, this.pricing.maxAdults || 0);
+    const children = Math.min(this.capacity.children || 0, this.pricing.maxChildren || 0);
     return (this.pricing.adultRate * adults) + (this.pricing.childRate * children);
   }
   if (this.pricing.perPersonPrices) {
-    const key = String(this.capacity.total);
+    const key = String(this.capacity.total || 0);
     return this.pricing.perPersonPrices.get(key) || 0;
   }
   return 0;
@@ -187,8 +180,9 @@ roomSchema.virtual('calculatedPrice').get(function () {
 
 // Instance method: calculate price dynamically
 roomSchema.methods.calculatePrice = function (numAdults, numChildren) {
+  if (!this.pricing || !this.capacity) return 0;
   if (this.pricing.perRoom) {
-    const extraPeople = Math.max(0, (numAdults + numChildren) - this.capacity.total);
+    const extraPeople = Math.max(0, (numAdults + numChildren) - (this.capacity.total || 0));
     return this.pricing.perRoom + (this.pricing.extraPersonCharge || 0) * extraPeople;
   }
   const adultRate = this.pricing.adultRate || (this.pricing.perPersonPrices?.get('1')) || 0;

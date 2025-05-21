@@ -6,7 +6,9 @@ import { connectToDatabase } from '@/app/utils/db';
 // GET handler for fetching property by unique URL
 export async function GET(req, context) {
   try {
-    const { uniqueUrl } = context.params;
+    // Fix: Await params if required by Next.js version
+    const params = (typeof context.params?.then === 'function') ? await context.params : context.params;
+    const uniqueUrl = params.uniqueUrl;
     console.log('DEBUG: Fetching property with uniqueUrl:', uniqueUrl);
     
     if (!uniqueUrl) {

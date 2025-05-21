@@ -134,7 +134,7 @@ export default function HostDashboard() {
         </button>
         
         <button 
-          onClick={() => router.push("/dashboard/host/bookings")}
+          onClick={() => router.push("/dashboard/host/today")}
           className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-md px-4 py-3 transition-colors flex items-center justify-between group"
         >
           <span className="text-sm sm:text-base">View today&apos;s bookings</span>

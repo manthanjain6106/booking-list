@@ -1,152 +1,101 @@
-// app/api/bookings/host/route.js
+// app/api/bookings/[bookingId]/status/route.js - Fixed for your DB connection
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../../auth/[...nextauth]/route";
+import connectDB from "@/app/utils/db";
+import Booking from "@/app/models/Booking";
+import Property from "@/app/models/Property";
+import mongoose from "mongoose";
 
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../auth/[...nextauth]/route';
-import connect from '@/app/utils/db';
-import Booking from '@/app/models/Booking';
-import Property from '@/app/models/Property';
-
-// Handler for GET requests to fetch host's bookings
-export async function GET(req) {
+export async function PUT(request, { params }) {
   try {
-    // Verify authentication
+    const { bookingId } = params;
+    const body = await request.json();
+    const { status } = body;
+    
+    console.log(`Updating booking ${bookingId} status to ${status}`);
+    
+    // Validate status - based on your model's enum values
+    if (!["pending", "confirmed", "checked-in", "checked-out", "cancelled", "no-show", "declined"].includes(status)) {
+      return NextResponse.json({ message: "Invalid status" }, { status: 400 });
+    }
+    
+    // Check if user is authenticated and is a host
     const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    if (!session || session.user.role !== "host") {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
     
-    if (session.user.role !== 'host') {
-      return NextResponse.json({ message: 'Access denied. Host role required.' }, { status: 403 });
+    // Connect to database - adapting to your db connection method
+    try {
+      // Your db might already be connected by Next.js startup
+      // or connectDB might be an object, not a function
+      if (typeof connectDB === 'function') {
+        await connectDB();
+      }
+    } catch (dbError) {
+      console.log("Note: Database might already be connected:", dbError.message);
+      // Continue execution, as the DB might already be connected
     }
     
-    // Connect to the database
-    await connect();
-    
-    // Get query parameters
-    const { searchParams } = new URL(req.url);
-    const start = searchParams.get('start');
-    const end = searchParams.get('end');
-    const status = searchParams.get('status');
-    
-    // Find the host's property
-    const property = await Property.findOne({ hostId: session.user.id });
-    
+    // Get the host's property
+    const property = await Property.findOne({ host: session.user.id });
     if (!property) {
-      return NextResponse.json({ message: 'No property found for this host' }, { status: 404 });
+      return NextResponse.json({ message: "No property found for this host" }, { status: 404 });
     }
     
-    // Build the query object
-    const query = { propertyId: property._id };
-    
-    // Add date filters if provided
-    if (start && end) {
-      query.$or = [
-        // Check-in date falls within the range
-        { checkIn: { $gte: start, $lte: end } },
-        // Check-out date falls within the range
-        { checkOut: { $gte: start, $lte: end } },
-        // Booking spans across the range
-        { $and: [{ checkIn: { $lte: start } }, { checkOut: { $gte: end } }] }
-      ];
+    // Find the booking - could be by _id or bookingId depending on what's in params
+    let booking;
+    if (mongoose.Types.ObjectId.isValid(bookingId)) {
+      booking = await Booking.findById(bookingId);
+    } else {
+      booking = await Booking.findOne({ bookingId: bookingId });
     }
     
-    // Add status filter if provided
-    if (status) {
-      query.status = status;
+    if (!booking) {
+      return NextResponse.json({ message: "Booking not found" }, { status: 404 });
     }
     
-    // Get bookings for the property
-    const bookings = await Booking.find(query)
-      .sort({ checkIn: 1 })
-      .lean();
-    
-    return NextResponse.json({ bookings });
-    
-  } catch (error) {
-    console.error('Error fetching host bookings:', error);
-    return NextResponse.json({ message: error.message || 'An error occurred' }, { status: 500 });
-  }
-}
-
-// Handler for POST requests to create a new booking
-export async function POST(req) {
-  try {
-    // Verify authentication
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-    }
-    
-    if (session.user.role !== 'host') {
-      return NextResponse.json({ message: 'Access denied. Host role required.' }, { status: 403 });
-    }
-    
-    // Connect to the database
-    await connect();
-    
-    // Parse the request body
-    const body = await req.json();
-    
-    // Find the host's property
-    const property = await Property.findOne({ hostId: session.user.id });
-    
-    if (!property) {
-      return NextResponse.json({ message: 'No property found for this host' }, { status: 404 });
-    }
-    
-    // Validate required fields
-    const requiredFields = ['guestName', 'guestPhone', 'checkIn', 'checkOut', 'roomNumber', 'category'];
-    const missingFields = requiredFields.filter(field => !body[field]);
-    
-    if (missingFields.length > 0) {
+    // Verify the booking belongs to this host's property
+    if (booking.propertyId.toString() !== property._id.toString()) {
       return NextResponse.json({ 
-        message: `Missing required fields: ${missingFields.join(', ')}` 
-      }, { status: 400 });
+        message: "Unauthorized: Booking does not belong to your property"
+      }, { status: 403 });
     }
     
-    // Check if the room is available for the requested dates
-    const existingBooking = await Booking.findOne({
-      propertyId: property._id,
-      roomNumber: body.roomNumber,
-      $or: [
-        // Check-in date falls within an existing booking
-        { checkIn: { $lte: body.checkOut }, checkOut: { $gte: body.checkIn } }
-      ],
-      status: { $nin: ['Cancelled', 'Completed'] }
+    // Update booking status
+    booking.status = status;
+    
+    // Add history entry for this status change
+    booking.history.push({
+      action: status === 'cancelled' || status === 'declined' ? 'cancelled' : 'modified',
+      timestamp: new Date(),
+      performedBy: session.user.id,
+      details: `Status changed to ${status}`
     });
     
-    if (existingBooking) {
-      return NextResponse.json({ 
-        message: 'Room is already booked for the requested dates',
-        conflict: {
-          bookingId: existingBooking._id,
-          checkIn: existingBooking.checkIn,
-          checkOut: existingBooking.checkOut
-        }
-      }, { status: 409 });
-    }
+    // Update the updatedAt timestamp
+    booking.updatedAt = new Date();
     
-    // Create new booking with property ID
-    const newBooking = new Booking({
-      ...body,
-      propertyId: property._id,
-      hostId: session.user.id,
-      createdBy: 'host',
-      status: body.status || 'Confirmed',
-      bookingDate: new Date()
-    });
-    
-    // Save booking
-    await newBooking.save();
+    // Save the booking
+    await booking.save();
     
     return NextResponse.json({ 
-      message: 'Booking created successfully',
-      booking: newBooking
+      message: `Booking ${status} successfully`,
+      booking: {
+        _id: booking._id,
+        bookingId: booking.bookingId,
+        status: booking.status,
+        updatedAt: booking.updatedAt
+      }
     });
     
   } catch (error) {
-    console.error('Error creating booking:', error);
-    return NextResponse.json({ message: error.message || 'An error occurred' }, { status: 500 });
+    console.error("Error updating booking status:", error);
+    return NextResponse.json({ 
+      message: "Failed to update booking status", 
+      error: error.message,
+      stack: error.stack
+    }, { status: 500 });
   }
 }

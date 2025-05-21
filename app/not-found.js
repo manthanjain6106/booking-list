@@ -25,7 +25,7 @@ export default function NotFound() {
       </Link>
 
       <div className="mt-12 text-xs text-gray-400">
-        StayEase © {new Date().getFullYear()} — All rights reserved
+        StayEase © 2025 — All rights reserved
       </div>
     </div>
   );

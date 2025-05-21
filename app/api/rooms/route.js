@@ -48,7 +48,7 @@ export async function POST(req) {
  for (const room of rooms) {
    // Check if this room already exists
    const existingRoom = await db.collection('rooms').findOne({
-     propertyId: new ObjectId(propertyId),
+     property: new ObjectId(propertyId),
      roomNumber: room.roomNumber
    });
 
@@ -61,12 +61,14 @@ export async function POST(req) {
          $set: {
            category: room.category,
            capacity: room.capacity,
-           price: room.price,
-           perPersonPrices: room.perPersonPrices,
            amenities: room.amenities,
-           extraPersonCharge: room.extraPersonCharge,
            agentCommission: room.agentCommission,
-           advanceAmount: room.advanceAmount,
+           pricing: {
+             advanceAmount: room.advanceAmount ?? 0,
+             extraPersonCharge: room.extraPersonCharge ?? 0,
+             perPersonPrices: room.perPersonPrices ?? null,
+             seasonalPricing: room.seasonalPricing ?? []
+           },
            updatedAt: new Date()
          } 
        }
@@ -79,17 +81,21 @@ export async function POST(req) {
    } else {
      // Create new room
      result = await db.collection('rooms').insertOne({
-       propertyId: new ObjectId(propertyId),
+       property: new ObjectId(propertyId),
        roomNumber: room.roomNumber,
        category: room.category,
        capacity: room.capacity,
-       price: room.price,
-       perPersonPrices: room.perPersonPrices,
        amenities: room.amenities,
-       extraPersonCharge: room.extraPersonCharge,
        agentCommission: room.agentCommission,
-       advanceAmount: room.advanceAmount,
-       status: 'available',
+       pricing: {
+         advanceAmount: room.advanceAmount ?? 0,
+         extraPersonCharge: room.extraPersonCharge ?? 0,
+         perPersonPrices: room.perPersonPrices ?? null,
+         seasonalPricing: room.seasonalPricing ?? []
+       },
+       isActive: true,
+       isAvailable: true,
+       images: room.images ?? [],
        createdAt: new Date(),
        updatedAt: new Date()
      });
@@ -159,7 +165,7 @@ try {
 
  // Get all rooms for this property
  const rooms = await db.collection('rooms')
-   .find({ propertyId: new ObjectId(propertyId) })
+   .find({ property: new ObjectId(propertyId) })
    .toArray();
 
  return Response.json({

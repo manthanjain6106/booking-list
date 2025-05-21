@@ -21,13 +21,19 @@ export async function POST(req) {
     const { db } = await connectToDatabase();
 
     // 4. Find user and update role
+    console.log("Session email for update:", session.user.email);
+    const userInDb = await db.collection('users').findOne({ email: session.user.email });
+    console.log("User found in DB:", userInDb);
+
     const updatedUser = await db.collection('users').findOneAndUpdate(
       { email: session.user.email },
       { $set: { role } },
       { returnDocument: 'after', upsert: true }
     );
+    console.log("Updated user result:", updatedUser);
 
-    if (!updatedUser.value) {
+    // Fix: Use updatedUser directly, not updatedUser.value
+    if (!updatedUser) {
       return Response.json(
         { success: false, message: "User not found or update failed" },
         { status: 404 }
@@ -38,9 +44,9 @@ export async function POST(req) {
       success: true,
       message: "Role updated successfully",
       user: {
-        name: updatedUser.value.name,
-        email: updatedUser.value.email,
-        role: updatedUser.value.role,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
       },
     });
   } catch (error) {
