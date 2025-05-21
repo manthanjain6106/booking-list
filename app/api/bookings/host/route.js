@@ -1,101 +1,111 @@
-// app/api/bookings/[bookingId]/status/route.js - Fixed for your DB connection
+// app/api/bookings/host/route.js
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../auth/[...nextauth]/route";
-import connectDB from "@/app/utils/db";
-import Booking from "@/app/models/Booking";
-import Property from "@/app/models/Property";
+import { connectToDatabase } from "@/app/utils/db";
 import mongoose from "mongoose";
 
-export async function PUT(request, { params }) {
+export async function GET(request) {
   try {
-    const { bookingId } = params;
-    const body = await request.json();
-    const { status } = body;
-    
-    console.log(`Updating booking ${bookingId} status to ${status}`);
-    
-    // Validate status - based on your model's enum values
-    if (!["pending", "confirmed", "checked-in", "checked-out", "cancelled", "no-show", "declined"].includes(status)) {
-      return NextResponse.json({ message: "Invalid status" }, { status: 400 });
-    }
-    
-    // Check if user is authenticated and is a host
+    // Authenticate the host
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "host") {
+    if (!session || session.user?.role !== "host") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
+
+    // Get the URL query parameters
+    const url = new URL(request.url);
+    const filter = url.searchParams.get('filter');
+    const statusFilter = url.searchParams.get('status');
     
-    // Connect to database - adapting to your db connection method
-    try {
-      // Your db might already be connected by Next.js startup
-      // or connectDB might be an object, not a function
-      if (typeof connectDB === 'function') {
-        await connectDB();
-      }
-    } catch (dbError) {
-      console.log("Note: Database might already be connected:", dbError.message);
-      // Continue execution, as the DB might already be connected
+    console.log(`Fetching bookings for host with filter: ${filter}, status: ${statusFilter}`);
+    
+    // Connect to the database
+    const { db } = await connectToDatabase();
+    
+    // Get host ID
+    const hostId = session.user.id;
+    
+    // Find ALL properties owned by this host
+    const propertiesCollection = db.collection("properties");
+    const hostProperties = await propertiesCollection.find({ 
+      host: new mongoose.Types.ObjectId(hostId) 
+    }).toArray();
+    
+    console.log(`Found ${hostProperties.length} properties for host ${hostId}`);
+    
+    if (hostProperties.length === 0) {
+      return NextResponse.json({ bookings: [] }, { status: 200 });
     }
     
-    // Get the host's property
-    const property = await Property.findOne({ host: session.user.id });
-    if (!property) {
-      return NextResponse.json({ message: "No property found for this host" }, { status: 404 });
+    // Get property IDs
+    const propertyIds = hostProperties.map(property => property._id.toString());
+    
+    // Build the query for bookings
+    const query = { propertyId: { $in: propertyIds } };
+    
+    // Add date filter if "today" is specified
+    if (filter === "today") {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      // Show bookings checking in today, checking out today, or staying today
+      query.$or = [
+        { checkIn: { $gte: today, $lt: tomorrow } }, // Check-ins today
+        { checkOut: { $gte: today, $lt: tomorrow } }, // Check-outs today
+        { $and: [{ checkIn: { $lt: today } }, { checkOut: { $gt: today } }] } // Staying today
+      ];
     }
     
-    // Find the booking - could be by _id or bookingId depending on what's in params
-    let booking;
-    if (mongoose.Types.ObjectId.isValid(bookingId)) {
-      booking = await Booking.findById(bookingId);
-    } else {
-      booking = await Booking.findOne({ bookingId: bookingId });
+    // Add status filter if provided
+    if (statusFilter) {
+      query.status = statusFilter;
     }
     
-    if (!booking) {
-      return NextResponse.json({ message: "Booking not found" }, { status: 404 });
-    }
+    console.log("Bookings query:", JSON.stringify(query));
     
-    // Verify the booking belongs to this host's property
-    if (booking.propertyId.toString() !== property._id.toString()) {
-      return NextResponse.json({ 
-        message: "Unauthorized: Booking does not belong to your property"
-      }, { status: 403 });
-    }
+    // Fetch bookings
+    const bookingsCollection = db.collection("bookings");
+    const bookings = await bookingsCollection.find(query).sort({ createdAt: -1 }).toArray();
     
-    // Update booking status
-    booking.status = status;
+    console.log(`Found ${bookings.length} bookings for host's properties`);
     
-    // Add history entry for this status change
-    booking.history.push({
-      action: status === 'cancelled' || status === 'declined' ? 'cancelled' : 'modified',
-      timestamp: new Date(),
-      performedBy: session.user.id,
-      details: `Status changed to ${status}`
-    });
+    // Fetch room details for each booking
+    const roomsCollection = db.collection("rooms");
+    const enrichedBookings = await Promise.all(
+      bookings.map(async (booking) => {
+        try {
+          const room = await roomsCollection.findOne({ 
+            _id: new mongoose.Types.ObjectId(booking.roomId)
+          });
+          
+          // Format guest info to match your frontend expectations
+          const guestInfo = {
+            name: booking.guestName,
+            phone: booking.guestPhone,
+            email: booking.guestEmail
+          };
+          
+          return {
+            ...booking,
+            guestInfo: guestInfo,
+            roomDetails: room || {}
+          };
+        } catch (err) {
+          console.error(`Error enriching booking ${booking._id}:`, err);
+          return booking;
+        }
+      })
+    );
     
-    // Update the updatedAt timestamp
-    booking.updatedAt = new Date();
-    
-    // Save the booking
-    await booking.save();
-    
-    return NextResponse.json({ 
-      message: `Booking ${status} successfully`,
-      booking: {
-        _id: booking._id,
-        bookingId: booking.bookingId,
-        status: booking.status,
-        updatedAt: booking.updatedAt
-      }
-    });
-    
+    return NextResponse.json({ bookings: enrichedBookings }, { status: 200 });
   } catch (error) {
-    console.error("Error updating booking status:", error);
+    console.error("Error fetching host bookings:", error);
     return NextResponse.json({ 
-      message: "Failed to update booking status", 
-      error: error.message,
-      stack: error.stack
+      message: "Failed to fetch bookings", 
+      error: error.message 
     }, { status: 500 });
   }
 }

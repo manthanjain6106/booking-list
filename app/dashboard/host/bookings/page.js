@@ -80,6 +80,70 @@ export default function HostBookings() {
     fetchHostBookings();
   }, [session, status, router]);
 
+  // Add handleStatusChange function
+  const handleStatusChange = async (bookingId, newStatus) => {
+    try {
+      // Update UI to show loading state for this booking
+      setBookings(prev => 
+        prev.map(booking => 
+          booking._id === bookingId ? { ...booking, isLoading: true } : booking
+        )
+      );
+      
+      // Send request to update booking status
+      const response = await fetch(`/api/bookings/${bookingId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      
+      // Log the response for debugging
+      console.log(`Status update response for booking ${bookingId}:`, response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Error response:", errorData);
+        throw new Error(errorData.message || "Failed to update booking status");
+      }
+      
+      // Update the booking in state
+      setBookings(prev =>
+        prev.map(booking =>
+          booking._id === bookingId
+            ? { ...booking, status: newStatus, isLoading: false }
+            : booking
+        )
+      );
+      
+      // Show success message
+      alert(`Booking ${newStatus === "confirmed" ? "accepted" : "declined"} successfully`);
+      
+    } catch (error) {
+      console.error("Error updating booking status:", error);
+      alert("Failed to update booking status. Please try again.");
+      
+      // Reset loading state
+      setBookings(prev => 
+        prev.map(booking => 
+          booking._id === bookingId ? { ...booking, isLoading: false } : booking
+        )
+      );
+      
+      // Update debug info with error
+      setDebugInfo(prev => ({ 
+        ...prev, 
+        statusUpdateError: { 
+          bookingId, 
+          newStatus,
+          error: error.message, 
+          time: new Date().toISOString() 
+        } 
+      }));
+    }
+  };
+
   // Format date to a more readable format
   const formatDate = (dateString) => {
     const options = { year: 'numeric', month: 'short', day: 'numeric' };
@@ -207,15 +271,23 @@ export default function HostBookings() {
                         </span>
                       </td>
                       
-                      {/* Actions */}
+                      {/* Actions - UPDATED with onClick handlers */}
                       <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                         {booking.status === 'pending' ? (
                           <div className="flex space-x-2">
-                            <button className="text-green-600 hover:text-green-900">
-                              Accept
+                            <button 
+                              onClick={() => handleStatusChange(booking._id, "confirmed")}
+                              disabled={booking.isLoading}
+                              className="text-green-600 hover:text-green-900 disabled:opacity-50"
+                            >
+                              {booking.isLoading ? "Processing..." : "Accept"}
                             </button>
-                            <button className="text-red-600 hover:text-red-900">
-                              Decline
+                            <button 
+                              onClick={() => handleStatusChange(booking._id, "declined")}
+                              disabled={booking.isLoading}
+                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                            >
+                              {booking.isLoading ? "Processing..." : "Decline"}
                             </button>
                           </div>
                         ) : (
@@ -230,12 +302,6 @@ export default function HostBookings() {
               </table>
             </div>
           )}
-          
-          {/* Debug Information (Development only) */}
-          <div className="mt-8 p-4 bg-gray-100 rounded text-gray-800 text-xs overflow-auto">
-            <h3 className="font-bold mb-2">Debug Information:</h3>
-            <pre>{JSON.stringify({ session, bookingsCount: bookings.length, ...debugInfo }, null, 2)}</pre>
-          </div>
         </div>
       </div>
     </div>

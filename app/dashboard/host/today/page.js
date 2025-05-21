@@ -26,7 +26,7 @@ export default function TodayBookings() {
         setIsLoading(true);
         setError(null);
         
-        const response = await fetch("/api/bookings/host?filter=today");
+        const response = await fetch("/api/bookings/host?status=pending");
         
         if (!response.ok) {
           throw new Error("Failed to fetch today's bookings");

@@ -26,9 +26,11 @@ export default function BookingConfirmationPage() {
         }
         
         const data = await res.json();
+        console.log("Booking data:", data); // Log the response to see structure
+        
         setBooking(data.booking);
-        setProperty(data.property);
-        setRoom(data.room);
+        setProperty(data.booking.property);
+        setRoom(data.booking.room);
       } catch (error) {
         console.error("Error fetching booking:", error);
         setError(error.message);
@@ -45,10 +47,7 @@ export default function BookingConfirmationPage() {
   // Generate a reference number
   const generateBookingRef = () => {
     if (!booking) return "";
-    const prefix = "FRA-BE";
-    const timestamp = new Date().getTime().toString().slice(-8);
-    const propertyCode = property?.name?.slice(0, 6).toUpperCase() || "STAY";
-    return `${prefix}-${timestamp}-${propertyCode}-BOOKING`;
+    return booking.bookingRef || booking.bookingId || `FRA-BE-${Date.now().toString().slice(-8)}-${property?.name?.slice(0, 6).toUpperCase() || "STAY"}-BOOKING`;
   };
   
   const closePopup = () => {
@@ -95,7 +94,13 @@ export default function BookingConfirmationPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Booking Confirmed</h3>
+              <h3 className="text-lg font-semibold text-gray-800">
+                {booking.status === 'confirmed' 
+                  ? 'Booking Confirmed' 
+                  : booking.status === 'pending'
+                  ? 'Booking Received'
+                  : 'Booking Status'}
+              </h3>
               <button 
                 onClick={closePopup}
                 className="text-gray-500 hover:text-gray-700 transition-colors"
@@ -111,7 +116,11 @@ export default function BookingConfirmationPage() {
               </div>
               
               <p className="text-center mb-4">
-                Your booking has been successfully created. Thank you for choosing our service!
+                {booking.status === 'confirmed'
+                  ? 'Your booking has been confirmed. Thank you for choosing our service!'
+                  : booking.status === 'pending'
+                  ? 'Your booking request has been received and is awaiting confirmation from the host.'
+                  : 'Your booking has been processed. Thank you for choosing our service!'}
               </p>
               
               <button
@@ -131,9 +140,41 @@ export default function BookingConfirmationPage() {
           <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
             <CheckCircle className="h-12 w-12 text-green-600" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Booking Confirmed!</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            {booking.status === 'confirmed' 
+              ? 'Booking Confirmed!' 
+              : booking.status === 'pending'
+              ? 'Booking Pending'
+              : booking.status === 'cancelled'
+              ? 'Booking Cancelled'
+              : 'Booking Processed'}
+          </h1>
           <p className="text-gray-500 text-lg mb-2">Booking Ref. {bookingRef}</p>
-          <p className="text-lg text-gray-600">Your booking request has been received and confirmed.</p>
+          
+          {/* Status badge */}
+          <div className="flex justify-center items-center mt-2 mb-4">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
+              booking.status === 'confirmed' 
+                ? 'bg-green-100 text-green-800' 
+                : booking.status === 'pending'
+                ? 'bg-yellow-100 text-yellow-800'
+                : booking.status === 'cancelled'
+                ? 'bg-red-100 text-red-800'
+                : 'bg-gray-100 text-gray-800'
+            }`}>
+              {booking.status ? booking.status.charAt(0).toUpperCase() + booking.status.slice(1) : 'Pending'}
+            </span>
+          </div>
+          
+          <p className="text-lg text-gray-600">
+            {booking.status === 'confirmed'
+              ? 'Your booking has been received and confirmed.'
+              : booking.status === 'pending'
+              ? 'Your booking request has been received and is awaiting confirmation from the host.'
+              : booking.status === 'cancelled'
+              ? 'This booking has been cancelled.'
+              : 'Your booking request has been processed.'}
+          </p>
         </div>
         
         {/* Booking Details Card */}
@@ -201,7 +242,9 @@ export default function BookingConfirmationPage() {
             
             <div className="mt-4">
               <p className="text-sm text-gray-500">Total Amount</p>
-              <p className="text-xl font-bold text-green-600">₹{booking.totalAmount?.toLocaleString() || 0}</p>
+              <p className="text-xl font-bold text-green-600">
+                ₹{(booking.totalAmount || booking.pricing?.totalAmount || 0).toLocaleString()}
+              </p>
             </div>
           </div>
           
