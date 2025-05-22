@@ -42,10 +42,8 @@ export const authOptions = {
       },
     }),
   ],
-
   callbacks: {
     async jwt({ token, user, account }) {
-      // On initial sign in
       if (user && account) {
         token.userId = user.id;
         token.role = user.role || "guest";
@@ -60,7 +58,7 @@ export const authOptions = {
               email: user.email,
               name: user.name,
               image: user.image,
-              role: "guest", // default role
+              role: "guest",
               hasOnboarded: false,
               createdAt: new Date(),
             });
@@ -75,7 +73,6 @@ export const authOptions = {
           }
         }
       }
-
       return token;
     },
 
@@ -88,13 +85,11 @@ export const authOptions = {
       return session;
     },
   },
-
   pages: {
     signIn: "/login",
     signUp: "/register",
     error: "/login",
   },
-
   secret: process.env.NEXTAUTH_SECRET,
   session: {
     strategy: "jwt",
@@ -102,4 +97,5 @@ export const authOptions = {
 };
 
 const handler = NextAuth(authOptions);
+
 export { handler as GET, handler as POST };
