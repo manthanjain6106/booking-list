@@ -1,7 +1,7 @@
-// app/booking/host/route.js - API route for host bookings
+// app/api/booking/host/route.js 
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../auth/[...nextauth]/route";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import connectDB from "@/app/utils/db";
 import Booking from "@/app/models/Booking";
 import Property from "@/app/models/Property";
