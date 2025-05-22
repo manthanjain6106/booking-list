@@ -5,7 +5,8 @@ import mongoose from "mongoose";
 
 export async function GET(request, { params }) {
   try {
-    const { bookingId } = params;
+    // ✅ Fixed: Await params before accessing properties (Next.js 15 requirement)
+    const { bookingId } = await params;
     
     if (!bookingId) {
       return NextResponse.json({ message: "Booking ID is required" }, { status: 400 });

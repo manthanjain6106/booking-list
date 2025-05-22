@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import connectDB from "@/app/utils/db";
+import { connectToDatabase } from "@/app/utils/db"; // Fixed: Use correct named import
+import { ObjectId } from "mongodb"; // Added missing import
 import Booking from "@/app/models/Booking";
 import Room from "@/app/models/Room";
 import User from "@/app/models/User";
-import Property from "@/app/models/Property"; // Added missing import
+import Property from "@/app/models/Property";
 
 export async function POST(request) {
   try {
-    await connectDB();
+    // Use the correct Mongoose connection
+    await dbConnect();
 
-    // Pass request to getServerSession for correct session retrieval
-    const session = await getServerSession(authOptions, request);
+    // Get session
+    const session = await getServerSession(authOptions);
 
     // Parse booking data from request
     const data = await request.json();
@@ -32,7 +34,7 @@ export async function POST(request) {
       );
     }
 
-    // Check if the room exists
+    // Check if the room exists using Mongoose
     const room = await Room.findById(data.roomId);
     if (!room) {
       return NextResponse.json({ message: "Room not found" }, { status: 404 });
@@ -49,7 +51,7 @@ export async function POST(request) {
       );
     }
 
-    // Check for overlapping bookings
+    // Check for overlapping bookings using Mongoose
     const existingBooking = await Booking.findOne({
       roomId: data.roomId,
       status: { $nin: ["declined", "cancelled"] },
@@ -71,11 +73,13 @@ export async function POST(request) {
     let userId = session?.user?.id;
 
     if (!userId && data.guestEmail) {
-      const existingUser = await User.findOne({ email: data.guestEmail });
+      const existingUser = await User.findOne({ 
+        email: data.guestEmail 
+      });
       userId = existingUser?._id;
     }
 
-    // Create new booking document
+    // Create new booking using Mongoose
     const newBooking = new Booking({
       propertyId: data.propertyId,
       roomId: data.roomId,
@@ -121,9 +125,9 @@ export async function POST(request) {
 
 export async function GET(request) {
   try {
-    await connectDB();
+    await dbConnect();
 
-    const session = await getServerSession(authOptions, request);
+    const session = await getServerSession(authOptions);
 
     if (!session) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
