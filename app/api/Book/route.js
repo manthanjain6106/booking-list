@@ -1,1 +1,0 @@
-// This API route is redundant and incorrectly named (should be lowercase 'booking'). All logic is already present in app/api/booking/route.js. Remove this file to fix Vercel build errors.
