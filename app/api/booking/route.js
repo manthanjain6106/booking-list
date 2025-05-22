@@ -1,3 +1,8 @@
+import connectDB from "@/app/utils/db";
+import Booking from "@/app/models/Booking";
+import Room from "@/app/models/Room";
+import Property from "@/app/models/Property";
+
 // In app/api/booking/route.js
 export async function POST(req) {
   try {

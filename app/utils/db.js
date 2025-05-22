@@ -27,4 +27,8 @@ export async function connectToDatabase() {
   return { client, db };
 }
 
+export async function connectDB() {
+  return clientPromise;
+}
+
 export default clientPromise;
