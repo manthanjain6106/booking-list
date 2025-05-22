@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import BookingUserDetailsForm from "@/components/BookingUserDetailsForm";
+import BookingUserDetailsForm from "../../../components/BookingUserDetailsForm";
 
 export default function BookingPage() {
   const { uniqueUrl, roomId } = useParams();
