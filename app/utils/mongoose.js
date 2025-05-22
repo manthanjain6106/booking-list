@@ -1,4 +1,4 @@
-// In app/utils/mongoose.js
+// app/utils/mongoose.js
 import mongoose from "mongoose";
 
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -7,6 +7,7 @@ if (!MONGODB_URI) {
   throw new Error("Please define the MONGODB_URI environment variable");
 }
 
+// Create a cached connection object in the global scope
 let cached = global.mongoose;
 
 if (!cached) {
@@ -15,6 +16,7 @@ if (!cached) {
 
 export async function dbConnect() {
   if (cached.conn) {
+    // Use existing cached connection
     return cached.conn;
   }
 
@@ -27,12 +29,12 @@ export async function dbConnect() {
       return mongoose;
     });
   }
-  
+
   try {
     cached.conn = await cached.promise;
-  } catch (e) {
+  } catch (error) {
     cached.promise = null;
-    throw e;
+    throw error;
   }
 
   return cached.conn;

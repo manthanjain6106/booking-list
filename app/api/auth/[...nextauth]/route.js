@@ -15,7 +15,7 @@ export const authOptions = {
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
+        email: { label: "Email", type: "email", placeholder: "john@example.com" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
@@ -28,14 +28,14 @@ export const authOptions = {
 
         if (!user) throw new Error("No user found with this email");
 
-        const isPasswordValid = await compare(credentials.password, user.password);
-        if (!isPasswordValid) throw new Error("Invalid password");
+        const isValid = await compare(credentials.password, user.password);
+        if (!isValid) throw new Error("Invalid password");
 
         return {
           id: user._id.toString(),
           email: user.email,
           name: user.name,
-          image: user.image || "",
+          image: user.image || null,
           role: user.role || "guest",
           hasOnboarded: user.hasOnboarded || false,
         };
@@ -44,12 +44,13 @@ export const authOptions = {
   ],
   callbacks: {
     async jwt({ token, user, account }) {
-      if (user && account) {
+      if (user) {
         token.userId = user.id;
         token.role = user.role || "guest";
         token.hasOnboarded = user.hasOnboarded || false;
 
-        if (account.provider === "google") {
+        // When signing in with Google, create user if not exists
+        if (account?.provider === "google") {
           const db = (await clientPromise).db(process.env.MONGODB_DB);
           const existingUser = await db.collection("users").findOne({ email: user.email });
 
@@ -87,8 +88,7 @@ export const authOptions = {
   },
   pages: {
     signIn: "/login",
-    signUp: "/register",
-    error: "/login",
+    error: "/login",  // Error page for auth errors
   },
   secret: process.env.NEXTAUTH_SECRET,
   session: {
