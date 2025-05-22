@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { MongoDBAdapter } from "@next-auth/mongodb-adapter";
-import  clientPromise  from "@/app/utils/db";
+import clientPromise from "@/app/utils/db";
 import { compare } from "bcryptjs";
 
 export const authOptions = {
@@ -23,57 +23,50 @@ export const authOptions = {
           throw new Error("Email and password are required");
         }
 
-        // Find user in database
         const db = (await clientPromise).db(process.env.MONGODB_DB);
-        const user = await db.collection("users").findOne({
-          email: credentials.email,
-        });
+        const user = await db.collection("users").findOne({ email: credentials.email });
 
-        if (!user) {
-          throw new Error("No user found with this email");
-        }
+        if (!user) throw new Error("No user found with this email");
 
-        // Check password
         const isPasswordValid = await compare(credentials.password, user.password);
-
-        if (!isPasswordValid) {
-          throw new Error("Invalid password");
-        }
+        if (!isPasswordValid) throw new Error("Invalid password");
 
         return {
           id: user._id.toString(),
           email: user.email,
           name: user.name,
-          role: user.role || "guest", // Default role
+          image: user.image || "",
+          role: user.role || "guest",
+          hasOnboarded: user.hasOnboarded || false,
         };
       },
     }),
   ],
+
   callbacks: {
     async jwt({ token, user, account }) {
-      // Initial sign in
-      if (account && user) {
-        token.role = user.role || "guest";
+      // On initial sign in
+      if (user && account) {
         token.userId = user.id;
+        token.role = user.role || "guest";
         token.hasOnboarded = user.hasOnboarded || false;
 
         if (account.provider === "google") {
           const db = (await clientPromise).db(process.env.MONGODB_DB);
-          const existingUser = await db.collection("users").findOne({
-            email: user.email,
-          });
+          const existingUser = await db.collection("users").findOne({ email: user.email });
 
           if (!existingUser) {
             const result = await db.collection("users").insertOne({
               email: user.email,
               name: user.name,
               image: user.image,
-              role: "guest",
+              role: "guest", // default role
               hasOnboarded: false,
               createdAt: new Date(),
             });
 
             token.userId = result.insertedId.toString();
+            token.role = "guest";
             token.hasOnboarded = false;
           } else {
             token.userId = existingUser._id.toString();
@@ -82,8 +75,10 @@ export const authOptions = {
           }
         }
       }
+
       return token;
     },
+
     async session({ session, token }) {
       if (token) {
         session.user.id = token.userId;
@@ -93,11 +88,13 @@ export const authOptions = {
       return session;
     },
   },
+
   pages: {
     signIn: "/login",
     signUp: "/register",
     error: "/login",
   },
+
   secret: process.env.NEXTAUTH_SECRET,
   session: {
     strategy: "jwt",
@@ -105,5 +102,4 @@ export const authOptions = {
 };
 
 const handler = NextAuth(authOptions);
-
 export { handler as GET, handler as POST };
