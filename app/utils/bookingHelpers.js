@@ -1,7 +1,7 @@
 // app/utils/bookingHelpers.js
-import { dbConnect } from "@/app/utils/mongoose";
-import Room from "@/app/models/Room";
-import Property from "@/app/models/Property";
+import { dbConnect } from "../utils/mongoose";
+import Room from "../models/Room";
+import Property from "../models/Property";
 
 export async function getRoomAndProperty(uniqueUrl, roomId) {
   try {

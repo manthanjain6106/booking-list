@@ -1,5 +1,5 @@
-import { connectToDatabase } from "@/app/utils/db";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { connectToDatabase } from "../../../utils/db";
+import { authOptions } from "../../auth/[...nextauth]/route";
 import { getServerSession } from "next-auth";
 import { ObjectId } from "mongodb";
 

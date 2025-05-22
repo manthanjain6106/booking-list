@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { MongoDBAdapter } from "@next-auth/mongodb-adapter";
-import clientPromise from "@/app/utils/db";
+import clientPromise from "../../../utils/db";
 import { compare } from "bcryptjs";
 
 export const authOptions = {

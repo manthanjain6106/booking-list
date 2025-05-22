@@ -1,6 +1,6 @@
 // app/api/rooms/[roomId]/route.js
-import { dbConnect } from "@/app/utils/mongoose";
-import Room from "@/app/models/Room";
+import { dbConnect } from "../../../utils/mongoose";
+import Room from "../../../models/Room";
 
 export async function GET(request, context) {
   try {

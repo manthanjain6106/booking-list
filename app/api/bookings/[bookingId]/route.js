@@ -1,6 +1,6 @@
 // app/api/bookings/[bookingId]/route.js
 import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/app/utils/db";
+import { connectToDatabase } from "../../../utils/db";
 import mongoose from "mongoose";
 
 export async function GET(request, { params }) {

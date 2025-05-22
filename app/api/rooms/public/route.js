@@ -1,7 +1,7 @@
 // app/api/rooms/public/route.js
 
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/app/utils/db';
+import { connectToDatabase } from '../../../utils/db';
 import { ObjectId } from 'mongodb';
 
 // GET handler for fetching public room information
