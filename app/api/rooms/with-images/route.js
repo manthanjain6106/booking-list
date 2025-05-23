@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../auth/[...nextauth]/route';
-import { connectToDatabase } from '../../../utils/db'; 
+import { connectToDatabase } from '../../../utils/db';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { promises as fsPromises } from 'fs';

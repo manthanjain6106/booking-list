@@ -1,6 +1,6 @@
 // app/api/bookings/[bookingId]/route.js
 import { NextResponse } from "next/server";
-import { connectDB } from "../../utils/db";
+import { connectToDatabase } from "../../utils/db";
 import mongoose from "mongoose";
 
 export async function GET(request, { params }) {
@@ -15,7 +15,7 @@ export async function GET(request, { params }) {
     console.log(`Fetching booking with ID: ${bookingId}`);
     
     // Connect to the database
-    const { db } = await connectDB();
+    const { db } = await connectToDatabase();
     
     // Try to convert the ID to ObjectId (it might be either an ObjectId or a string bookingId)
     let booking;

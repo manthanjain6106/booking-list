@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../api/auth/[...nextauth]/route";
-import { connectToDatabase } from "../../utils/db"; 
+import { connectToDatabase } from "../../utils/db";
 import mongoose from "mongoose";
 
 // Generate a unique bookingId
