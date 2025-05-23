@@ -1,7 +1,7 @@
-import { dbConnect } from "../../../utils/mongoose";
-import Booking from "../../../models/Booking";
-import Room from "../../../models/Room";
-import Property from "../../../models/Property";
+import { dbConnect } from "../../utils/mongoose";
+import Booking from "../../models/Booking";
+import Room from "../../models/Room";
+import Property from "../../models/Property";
 
 // In app/api/booking/route.js
 export async function POST(req) {
