@@ -3,8 +3,8 @@
 
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from "../../auth/[...nextauth]/route";
-import { connectToDatabase } from "../../../../utils/db";
+import { authOptions } from '../../auth/[...nextauth]/route';
+import { connectToDatabase } from '../../../utils/db';
 import { ObjectId } from 'mongodb';
 
 export async function GET(request) {

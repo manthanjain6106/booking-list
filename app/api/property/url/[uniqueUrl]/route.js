@@ -1,7 +1,7 @@
 // app/api/property/url/[uniqueUrl]/route.js
 
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '../../../../../utils/db';
+import { connectToDatabase } from '../../../../utils/db';
 
 // GET handler for fetching property by unique URL
 export async function GET(req, context) {
