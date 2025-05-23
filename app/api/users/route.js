@@ -1,5 +1,5 @@
 // /app/api/users/route.js
-import { connectToDatabase } from "../../../utils/db";
+import { connectToDatabase } from "../../utils/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 
